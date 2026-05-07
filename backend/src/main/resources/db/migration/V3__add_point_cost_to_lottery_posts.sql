@@ -1,0 +1,1 @@
+ALTER TABLE lottery_posts ADD COLUMN point_cost INT NOT NULL DEFAULT 0;

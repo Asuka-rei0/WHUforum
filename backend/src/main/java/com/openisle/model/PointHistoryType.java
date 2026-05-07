@@ -1,0 +1,18 @@
+package com.openisle.model;
+
+public enum PointHistoryType {
+  POST,
+  COMMENT,
+  POST_LIKED,
+  COMMENT_LIKED,
+  POST_LIKE_CANCELLED,
+  COMMENT_LIKE_CANCELLED,
+  INVITE,
+  FEATURE,
+  SYSTEM_ONLINE,
+  REDEEM,
+  LOTTERY_JOIN,
+  LOTTERY_REWARD,
+  DONATE_SENT,
+  DONATE_RECEIVED,
+}

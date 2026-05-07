@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- 定义日志输出格式 -->
+    <property name="LOG_PATTERN" value="%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n"/>
+    
+    <!-- 控制台输出 -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+    
+    <!-- 文件输出 -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/websocket-service.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/websocket-service.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+    
+    <!-- WebSocket 相关日志 -->
+    <appender name="WEBSOCKET_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>logs/websocket.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/websocket.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>7</maxHistory>
+            <totalSizeCap>500MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+    
+    <!-- 错误日志单独输出 -->
+    <appender name="ERROR_FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.LevelFilter">
+            <level>ERROR</level>
+            <onMatch>ACCEPT</onMatch>
+            <onMismatch>DENY</onMismatch>
+        </filter>
+        <file>logs/error.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <fileNamePattern>logs/error.%d{yyyy-MM-dd}.%i.log</fileNamePattern>
+            <maxFileSize>10MB</maxFileSize>
+            <maxHistory>30</maxHistory>
+            <totalSizeCap>500MB</totalSizeCap>
+        </rollingPolicy>
+        <encoder>
+            <pattern>${LOG_PATTERN}</pattern>
+            <charset>UTF-8</charset>
+        </encoder>
+    </appender>
+    
+    <!-- 异步日志配置 -->
+    <appender name="ASYNC_FILE" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>512</queueSize>
+        <includeCallerData>false</includeCallerData>
+        <appender-ref ref="FILE"/>
+    </appender>
+    
+    <!-- 异步 WebSocket 日志 -->
+    <appender name="ASYNC_WEBSOCKET" class="ch.qos.logback.classic.AsyncAppender">
+        <discardingThreshold>0</discardingThreshold>
+        <queueSize>256</queueSize>
+        <includeCallerData>false</includeCallerData>
+        <appender-ref ref="WEBSOCKET_FILE"/>
+    </appender>
+    
+    <!-- 特定包的日志级别配置 -->
+    <logger name="com.openisle.websocket" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </logger>
+    
+    <!-- WebSocket 相关日志 -->
+    <logger name="com.openisle.websocket.controller.WebSocketController" level="DEBUG" additivity="false">
+        <appender-ref ref="ASYNC_WEBSOCKET"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+    
+    <logger name="com.openisle.websocket.config.WebSocketAuthInterceptor" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_WEBSOCKET"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+    
+    <logger name="com.openisle.websocket.listener.NotificationListener" level="INFO" additivity="false">
+        <appender-ref ref="ASYNC_WEBSOCKET"/>
+        <appender-ref ref="CONSOLE"/>
+    </logger>
+    
+    <!-- Spring WebSocket 日志 -->
+    <logger name="org.springframework.web.socket" level="DEBUG" additivity="false">
+        <appender-ref ref="ASYNC_WEBSOCKET"/>
+    </logger>
+    
+    <logger name="org.springframework.messaging" level="DEBUG" additivity="false">
+        <appender-ref ref="ASYNC_WEBSOCKET"/>
+    </logger>
+    
+    <!-- RabbitMQ 日志 -->
+    <logger name="org.springframework.amqp" level="INFO" additivity="false">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_FILE"/>
+    </logger>
+    
+    <!-- 根日志级别配置 -->
+    <root level="INFO">
+        <appender-ref ref="CONSOLE"/>
+        <appender-ref ref="ASYNC_FILE"/>
+        <appender-ref ref="ERROR_FILE"/>
+    </root>
+    
+    <!-- 开发环境配置 -->
+    <springProfile name="dev">
+        <root level="DEBUG">
+            <appender-ref ref="CONSOLE"/>
+        </root>
+    </springProfile>
+    
+    <!-- 生产环境配置 -->
+    <springProfile name="prod">
+        <root level="WARN">
+            <appender-ref ref="ASYNC_FILE"/>
+            <appender-ref ref="ERROR_FILE"/>
+        </root>
+    </springProfile>
+    
+</configuration>

@@ -1,0 +1,39 @@
+{
+  "name": "frontend_nuxt",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "scripts": {
+    "dev": "nuxt dev",
+    "build": "nuxt build",
+    "start": "nuxt start",
+    "generate": "nuxt generate"
+  },
+  "dependencies": {
+    "@icon-park/vue-next": "^1.4.2",
+    "@nuxt/image": "^1.11.0",
+    "@stomp/stompjs": "^7.0.0",
+    "cropperjs": "^1.6.2",
+    "diff": "^8.0.2",
+    "diff2html": "^3.4.52",
+    "echarts": "^5.6.0",
+    "flatpickr": "^4.6.13",
+    "highlight.js": "^11.11.1",
+    "ipx": "^3.1.1",
+    "ldrs": "^1.0.0",
+    "markdown-it": "^14.1.0",
+    "mermaid": "^10.9.4",
+    "nanoid": "^5.1.5",
+    "nprogress": "^0.2.0",
+    "nuxt": "latest",
+    "sanitize-html": "^2.17.0",
+    "sockjs-client": "^1.6.1",
+    "vditor": "^3.11.1",
+    "vue-easy-lightbox": "^1.19.0",
+    "vue-echarts": "^7.0.3",
+    "vue-flatpickr-component": "^12.0.0",
+    "vue-toastification": "^2.0.0-rc.5"
+  }
+}

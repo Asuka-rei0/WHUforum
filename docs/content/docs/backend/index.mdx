@@ -1,0 +1,43 @@
+---
+title: 后端开发
+description: OpenIsle 后端服务开发指南
+---
+
+# 后端开发
+
+OpenIsle 后端基于 Spring Boot 框架构建，提供完整的 RESTful API 服务。
+
+## 技术栈
+
+- **Spring Boot** - 主框架
+- **Spring Security** - 安全认证
+- **MyBatis** - 数据访问层
+- **MySQL** - 数据库
+- **Redis** - 缓存和会话存储
+
+## 项目结构
+
+```
+backend/
+├── src/main/java/com/
+│   ├── controller/     # 控制器层
+│   ├── service/        # 业务逻辑层
+│   ├── mapper/         # 数据访问层
+│   ├── entity/         # 实体类
+│   └── config/         # 配置类
+└── src/main/resources/
+    ├── application.properties
+    └── mapper/         # MyBatis 映射文件
+```
+
+## 开发环境设置
+
+1. 安装 Java 17+
+2. 安装 MySQL 8.0+
+3. 安装 Redis
+4. 配置数据库连接
+5. 启动应用
+
+## API 接口
+
+详细的 API 接口文档请查看 [API 文档](/openapi)。

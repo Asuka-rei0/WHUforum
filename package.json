@@ -1,0 +1,30 @@
+{
+  "name": "openisle",
+  "version": "1.0.0",
+  "private": true,
+  "description": "<p align=\"center\">   <BaseImage alt=\"OpenIsle\" src=\"https://openisle-1307107697.cos.ap-guangzhou.myqcloud.com/assert/image.png\" width=\"200\">   <br><br>   高效的开源社区前后端端平台   <br><br>   <a href=\"LICENSE\"><BaseImage src=\"https://img.shields.io/badge/license-MIT-blue.svg?style=flat-square\"></a> </p>",
+  "author": "nagisa77",
+  "license": "ISC",
+  "homepage": "https://www.open-isle.com",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nagisa77/OpenIsle.git"
+  },
+  "bugs": {
+    "url": "https://github.com/nagisa77/OpenIsle/issues"
+  },
+  "keywords": [],
+  "scripts": {
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "husky": "^9.1.7",
+    "lint-staged": "^16.1.5",
+    "prettier": "^3.6.2",
+    "prettier-plugin-java": "^2.6.3"
+  },
+  "lint-staged": {
+    "frontend_nuxt/**/*": "prettier --write --cache --ignore-unknown",
+    "backend/src/**/*.java": "prettier --write --cache --ignore-unknown"
+  }
+}

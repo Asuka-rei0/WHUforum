@@ -1,0 +1,9 @@
+# generated content
+.contentlayer
+.content-collections
+.source
+.next/
+.vercel
+next-env.d.ts
+openapi.json
+openapi.yaml

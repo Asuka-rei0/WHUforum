@@ -1,0 +1,149 @@
+package com.openisle.controller;
+
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import com.openisle.mapper.PostMapper;
+import com.openisle.mapper.TagMapper;
+import com.openisle.model.Tag;
+import com.openisle.repository.UserRepository;
+import com.openisle.service.PostService;
+import com.openisle.service.TagService;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+
+@WebMvcTest(TagController.class)
+@AutoConfigureMockMvc(addFilters = false)
+@Import(TagMapper.class)
+class TagControllerTest {
+
+  @Autowired
+  private MockMvc mockMvc;
+
+  @MockBean
+  private TagService tagService;
+
+  @MockBean
+  private PostService postService;
+
+  @MockBean
+  private UserRepository userRepository;
+
+  @MockBean
+  private PostMapper postMapper;
+
+  @Test
+  void createAndGetTag() throws Exception {
+    Tag t = new Tag();
+    t.setId(1L);
+    t.setName("java");
+    t.setDescription("d");
+    t.setIcon("i");
+    t.setSmallIcon("s1");
+    Mockito.when(
+      tagService.createTag(eq("java"), eq("d"), eq("i"), eq("s1"), eq(true), isNull())
+    ).thenReturn(t);
+    Mockito.when(tagService.getTag(1L)).thenReturn(t);
+
+    mockMvc
+      .perform(
+        post("/api/tags")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content("{\"name\":\"java\",\"description\":\"d\",\"icon\":\"i\",\"smallIcon\":\"s1\"}")
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.name").value("java"))
+      .andExpect(jsonPath("$.description").value("d"))
+      .andExpect(jsonPath("$.icon").value("i"))
+      .andExpect(jsonPath("$.smallIcon").value("s1"));
+
+    mockMvc
+      .perform(get("/api/tags/1"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.id").value(1));
+  }
+
+  @Test
+  void listTags() throws Exception {
+    Tag t = new Tag();
+    t.setId(2L);
+    t.setName("spring");
+    t.setDescription("d2");
+    t.setIcon("i2");
+    t.setSmallIcon("s2");
+    Mockito.when(tagService.searchTags(null)).thenReturn(List.of(t));
+    Mockito.when(postService.countPostsByTagIds(List.of(2L))).thenReturn(java.util.Map.of());
+
+    mockMvc
+      .perform(get("/api/tags"))
+      .andExpect(status().isOk())
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$[0].name").value("spring"))
+      .andExpect(jsonPath("$[0].description").value("d2"))
+      .andExpect(jsonPath("$[0].icon").value("i2"))
+      .andExpect(jsonPath("$[0].smallIcon").value("s2"));
+  }
+
+  @Test
+  void listTagsWithPagination() throws Exception {
+    Tag t1 = new Tag();
+    t1.setId(1L);
+    t1.setName("java");
+    Tag t2 = new Tag();
+    t2.setId(2L);
+    t2.setName("spring");
+    Mockito.when(tagService.searchTags(null)).thenReturn(List.of(t1, t2));
+    Mockito.when(postService.countPostsByTagIds(List.of(1L, 2L))).thenReturn(
+      java.util.Map.of(1L, 1L, 2L, 5L)
+    );
+
+    mockMvc
+      .perform(get("/api/tags").param("page", "1").param("pageSize", "1"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(1)))
+      .andExpect(jsonPath("$[0].id").value(1));
+
+    mockMvc
+      .perform(get("/api/tags").param("page", "2").param("pageSize", "1"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$", org.hamcrest.Matchers.hasSize(0)));
+  }
+
+  @Test
+  void updateTag() throws Exception {
+    Tag t = new Tag();
+    t.setId(3L);
+    t.setName("java");
+    t.setDescription("d3");
+    t.setIcon("i3");
+    t.setSmallIcon("s3");
+    Mockito.when(tagService.updateTag(eq(3L), eq("java"), eq("d3"), eq("i3"), eq("s3"))).thenReturn(
+      t
+    );
+
+    mockMvc
+      .perform(
+        put("/api/tags/3")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+            "{\"name\":\"java\",\"description\":\"d3\",\"icon\":\"i3\",\"smallIcon\":\"s3\"}"
+          )
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.id").value(3))
+      .andExpect(jsonPath("$.name").value("java"))
+      .andExpect(jsonPath("$.description").value("d3"))
+      .andExpect(jsonPath("$.icon").value("i3"))
+      .andExpect(jsonPath("$.smallIcon").value("s3"));
+  }
+}

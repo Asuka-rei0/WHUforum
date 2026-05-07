@@ -1,0 +1,52 @@
+name: Deploy Documentation
+
+on:
+  workflow_call:
+    inputs:
+      build-id:
+        required: false
+        type: string
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 文档发布自己的排队锁，不影响服务器部署
+concurrency:
+  group: openisle-docs
+  cancel-in-progress: false
+
+jobs:
+  build-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Log build
+        run: echo "Running documentation deployment from build ${{ inputs.build-id }}"
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install Bun dependencies
+        run: bun install
+        working-directory: ./docs
+
+      - name: Generate API MDX
+        run: bun run generate
+        working-directory: ./docs
+
+      - name: Build documentation
+        run: bun run build
+        working-directory: ./docs
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages
+          folder: ./docs/out
