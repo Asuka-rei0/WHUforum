@@ -1,55 +1,161 @@
-<p align="center">
-  <img alt="OpenIsle" src="https://openisle-1307107697.cos.ap-guangzhou.myqcloud.com/assert/image.png" width="200">
-  <br>
-  高效的开源社区前后端平台
-  <br><br><br>
-  <img alt="Image" src="https://openisle-1307107697.cos.accelerate.myqcloud.com/dynamic_assert/22752cfac5a04a9c90c41995b9f55fed.png" width="1200">
-    <br><br><br>
-  <a href="https://hellogithub.com/repository/nagisa77/OpenIsle" target="_blank"><img src="https://abroad.hellogithub.com/v1/widgets/recommend.svg?rid=8605546658d94cbab45182af2a02e4c8&claim_uid=p5GNFTtZl6HBAYQ" alt="Featured｜HelloGitHub" style="width: 250px; height: 54px;" width="250" height="54" /></a>
-</p>
+# WHUforum
 
-## 💡 简介
+WHUforum 是基于 OpenIsle 演进的校园论坛系统，面向武汉大学校园社区场景，提供帖子发布、评论互动、搜索、通知、校园身份认证、内容审核、二手市场等能力。项目采用前后端分离和多服务架构，适合本地开发、二次开发以及容器化部署。
 
-OpenIsle 是一个使用 Spring Boot 和 Vue 3 构建的全栈开源社区平台，提供用户注册、登录、贴文发布、评论交互等完整功能，可用于项目社区或直接打造自主社区站点。
+## 项目组成
 
-## 🚧 开发 & 部署
+| 目录 | 说明 |
+| --- | --- |
+| `backend/` | Spring Boot 主后端，提供 REST API、JWT 鉴权、MySQL/JPA、Redis、RabbitMQ、OpenSearch、OpenAPI 等能力 |
+| `frontend_nuxt/` | Nuxt 3 前端，负责页面渲染、用户交互、OAuth/CAS 回调、WebSocket 连接 |
+| `websocket_service/` | 独立 WebSocket/STOMP 服务，消费 RabbitMQ 通知并向前端实时推送 |
+| `mcp/` | Python MCP Server，将搜索、发帖、回复、通知等能力封装为 MCP 工具 |
+| `docs/` | Fumadocs 文档站与 OpenAPI 文档生成逻辑 |
+| `docker/` | Docker Compose、本地依赖服务与容器化启动配置 |
+| `deploy/` | 生产与预发部署脚本 |
+| `bots/` | 定时 Bot 脚本 |
 
-详细见 [Contributing](https://github.com/nagisa77/OpenIsle?tab=contributing-ov-file)
+## 技术栈
 
-## ✨ 项目特点
+- 后端：Java 17、Spring Boot 3、Spring Security、Spring Data JPA、Maven
+- 前端：Node.js 20+、Nuxt 3、Vue 3、STOMP/WebSocket
+- 基础设施：MySQL 8、Redis 7、RabbitMQ、OpenSearch（可选）
+- 工具与扩展：Python 3.11+、MCP、Fumadocs、Docker Compose
 
-- JWT 认证以及 Google、GitHub、Discord、Twitter 等多种 OAuth 登录
-- 支持分类、标签的贴文管理以及草稿保存功能
-- 嵌套评论、指定贴文或评论的点赞/抖弹系统
-- 定制统计和通知消息，包括日活跃用户等数据
-- 全局搜索，支持用户和很多内容的搜索以及内容缩略
-- 集成 OpenAI 提供的 Markdown 格式化功能
-- 通过环境变量可调整密码强度、登录方式、保护码等多种配置
-- 支持图片上传，默认使用腾讯云 COS 扩展
-- Bot 集成，可在平台内快速连接自定义机器人，并通过 Telegram 的 BotFather 创建和管理消息机器人，拓展社区互动渠道
-- 浏览器推送通知，离开网站也能及时收到提醒
+## 环境准备
 
-## 🌟 项目优势
+本地启动前请先安装：
 
-- 全面开源，便于二次开发和自定义扩展
-- Spring Boot + Vue 3 成熟技术栈，学习起点低，社区资源丰富
-- 支持多种登录方式和角色权限，容易展展到不同场景
-- 模块化设计，代码结构清晰，维护成本低
-- REST API 可接入任意前端框架，兼容多端平台
-- 配置简单，通过环境变量快速调整和部署
-- 如需推送通知，请设置 `WEBPUSH_PUBLIC_KEY` 和 `WEBPUSH_PRIVATE_KEY` 环境变量
+- Docker 与 Docker Compose
+- JDK 17
+- Maven 3.9+
+- Node.js 20+ 与 npm
+- Python 3.11+（仅运行 MCP 服务时需要）
 
-## 🏘️ 社区
+复制环境变量示例文件：
 
-- 欢迎彼此交流和使用 OpenIsle，项目以开源方式提供；如果遇到问题请到 GitHub 的 Issues 页面反馈，想发起话题讨论也可以前往源站 <https://www.open-isle.com>，这里提供更完整的社区板块与互动体验。
+```bash
+cp .env.example .env
+```
 
-## 📋 授权
+开发环境可以直接使用 `.env.example` 中的默认本地配置。涉及 JWT、CAS、COS、OAuth、WebPush、OpenAI 等外部服务时，请在 `.env` 中替换为自己的配置，避免提交真实密钥。
 
-本项目以 MIT License 发布，欢迎自由使用与修改。
+## 启动方式一：Docker Compose 一键启动
 
-## 🙏 鼓赞
+推荐第一次运行或需要完整联调时使用。该方式会启动 MySQL、Redis、RabbitMQ、后端、WebSocket 服务、前端开发服务和 MCP 服务。
 
-- [Spring Boot](https://spring.io/projects/spring-boot)
-- [JJWT](https://github.com/jwtk/jjwt)
-- [Lombok](https://github.com/projectlombok/lombok)
-- 以及所有开源贡献者
+```bash
+docker compose --env-file .env -f docker/docker-compose.yaml --profile dev up --build
+```
+
+启动完成后访问：
+
+- 前端页面：<http://localhost:3000>
+- 后端 API：<http://localhost:8080>
+- WebSocket 服务：<http://localhost:8082>
+- MCP 服务：<http://localhost:8085>
+- RabbitMQ 管理台：<http://localhost:15672>
+
+停止服务：
+
+```bash
+docker compose --env-file .env -f docker/docker-compose.yaml --profile dev down
+```
+
+如需保留数据库、Redis、RabbitMQ 等数据卷，只执行上面的 `down` 即可；如需清空本地容器数据，请额外确认后再删除 Docker volume。
+
+## 启动方式二：本地源码启动
+
+适合需要调试 Java 或前端源码的开发场景。可以先用 Docker 启动基础依赖，再分别运行后端、WebSocket 和前端。
+
+### 1. 启动基础依赖
+
+```bash
+docker compose --env-file .env -f docker/docker-compose.yaml --profile dev_local_backend up mysql redis rabbitmq websocket-service
+```
+
+### 2. 启动后端
+
+```bash
+cd backend
+mvn spring-boot:run
+```
+
+后端默认运行在 <http://localhost:8080>。
+
+### 3. 启动前端
+
+```bash
+cd frontend_nuxt
+npm install
+npm run dev
+```
+
+前端默认运行在 <http://localhost:3000>。
+
+### 4. 启动 WebSocket 服务（可选）
+
+如果没有通过 Docker 启动 `websocket-service`，也可以本地运行：
+
+```bash
+cd websocket_service
+mvn spring-boot:run
+```
+
+WebSocket 服务默认运行在 <http://localhost:8082>。
+
+### 5. 启动 MCP 服务（可选）
+
+```bash
+cd mcp
+python -m pip install -e .
+openisle-mcp
+```
+
+MCP 服务默认连接后端 API，可通过 `.env` 中的 `OPENISLE_MCP_*` 配置调整监听地址、端口和请求超时。
+
+## 常用命令
+
+```bash
+# 后端测试
+cd backend
+mvn test
+
+# 前端构建
+cd frontend_nuxt
+npm run build
+
+# WebSocket 服务测试
+cd websocket_service
+mvn test
+
+# 文档生成与构建
+cd docs
+bun run generate
+bun run build
+```
+
+## 默认端口
+
+| 服务 | 默认端口 |
+| --- | --- |
+| 前端 Nuxt | `3000` |
+| 后端 Spring Boot | `8080` |
+| WebSocket 服务 | `8082` |
+| MCP 服务 | `8085` |
+| MySQL | `3306` |
+| Redis | `6379` |
+| RabbitMQ | `5672` |
+| RabbitMQ 管理台 | `15672` |
+| OpenSearch（可选） | `9200` |
+
+## 开发约定
+
+- 环境变量以根目录 `.env.example` 为基线，新增或改名时需同步各服务消费端。
+- 后端、WebSocket、前端涉及鉴权或消息结构的改动，应同步确认 API、JWT、RabbitMQ 分片和 WebSocket 推送契约。
+- 不提交 `.env`、密钥、令牌或生产凭证。
+- 提交前按改动范围执行最小验证命令。
+
+## 许可证
+
+本项目沿用 MIT License，详见 [LICENSE](LICENSE)。
