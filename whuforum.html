@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>欢迎加入武汉大学校园论坛</title>
+</head>
+<body style="margin: 0; padding: 0; background-color: #f4f6f8; font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Microsoft YaHei', Arial, sans-serif;">
+    <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #f4f6f8; padding: 40px 0;">
+        <tr>
+            <td align="center">
+                <table width="600" border="0" cellspacing="0" cellpadding="0" style="background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05);">
+                    
+                    <!-- 顶部 Header -->
+                    <tr>
+                        <td align="center" style="background-color: #174c3d; padding: 25px;">
+                            <h2 style="margin: 0; color: #ffffff; font-size: 24px; font-weight: normal;">武汉大学校园论坛</h2>
+                        </td>
+                    </tr>
+                    
+                    <!-- 邮件主体内容 -->
+                    <tr>
+                        <td style="padding: 40px 30px; color: #333333; line-height: 1.8; font-size: 15px;">
+                            <p style="margin-top: 0;">亲爱的 <strong>{{username}}</strong>，你好！</p>
+                            <p>山水一程，三生有幸。欢迎加入武汉大学校园论坛。很高兴能在珞珈山下的这片网络精神家园遇见你！</p>
+                            <p>为了保障你的账号安全并开启全部论坛功能，请点击下方按钮验证并激活你的注册邮箱：</p>
+                            
+                            <!-- 激活按钮：腾讯云 SES 要求模板内保留固定域名，仅 token 使用变量 -->
+                            <div style="text-align: center; margin: 35px 0;">
+                                <a href="https://forum.whu.edu.cn/activate?token={{token}}" style="background-color: #174c3d; color: #ffffff; padding: 12px 30px; text-decoration: none; border-radius: 4px; font-size: 16px; font-weight: bold; display: inline-block;">激活我的账号</a>
+                            </div>
+                            
+                            <!-- 备用链接：同步修改 -->
+                            <p style="font-size: 13px; color: #666666; margin-bottom: 5px;">如果上方按钮无法点击，请将以下链接完整复制到浏览器地址栏中打开：</p>
+                            <p style="font-size: 13px; color: #4a90e2; word-break: break-all; background-color: #f9f9f9; padding: 12px; border-radius: 4px; margin-top: 0;">
+                                https://forum.whu.edu.cn/activate?token={{token}}
+                            </p>
+                            
+                            <!-- 安全提示 -->
+                            <p style="font-size: 12px; color: #999999; margin-top: 30px;">
+                                注：该激活链接在 24 小时内有效。如果你并未尝试注册本论坛，请忽略并删除此邮件。
+                            </p>
+                        </td>
+                    </tr>
+                    
+                    <!-- 底部 Footer -->
+                    <tr>
+                        <td align="center" style="background-color: #fafafa; padding: 20px; font-size: 12px; color: #a0a0a0; border-top: 1px solid #eeeeee;">
+                            <p style="margin: 5px 0; font-weight: bold; letter-spacing: 2px;">自强 弘毅 求是 拓新</p>
+                            <p style="margin: 5px 0;">武汉大学校园论坛管理团队 敬上</p>
+                            <p style="margin: 5px 0;">如需帮助，请联系管理员：asukarei@whu.edu.cn</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

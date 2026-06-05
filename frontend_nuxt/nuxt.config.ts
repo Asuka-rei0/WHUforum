@@ -10,15 +10,12 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       apiBaseUrl: process.server
-        ? process.env.NUXT_PUBLIC_API_BASE_URL_SSR
-        : process.env.NUXT_PUBLIC_API_BASE_URL,
+        ? process.env.NUXT_PUBLIC_API_BASE_URL_SSR ||
+          process.env.NUXT_PUBLIC_API_BASE_URL ||
+          'http://localhost:8080'
+        : process.env.NUXT_PUBLIC_API_BASE_URL || 'http://localhost:8080',
       websocketUrl: process.env.NUXT_PUBLIC_WEBSOCKET_URL || '',
-      websiteBaseUrl: process.env.NUXT_PUBLIC_WEBSITE_BASE_URL || '',
-      googleClientId: process.env.NUXT_PUBLIC_GOOGLE_CLIENT_ID || '',
-      githubClientId: process.env.NUXT_PUBLIC_GITHUB_CLIENT_ID || '',
-      discordClientId: process.env.NUXT_PUBLIC_DISCORD_CLIENT_ID || '',
-      twitterClientId: process.env.NUXT_PUBLIC_TWITTER_CLIENT_ID || '',
-      telegramBotId: process.env.NUXT_PUBLIC_TELEGRAM_BOT_ID || '',
+      websiteBaseUrl: process.env.NUXT_PUBLIC_WEBSITE_BASE_URL || 'http://localhost:3000',
     },
   },
   css: [
@@ -30,6 +27,7 @@ export default defineNuxtConfig({
   app: {
     pageTransition: { name: 'page', mode: 'out-in' },
     head: {
+      title: '珞珈论坛',
       script: [
         {
           tagPriority: 'high',
@@ -77,7 +75,7 @@ export default defineNuxtConfig({
         },
         {
           rel: 'apple-touch-icon',
-          href: '/apple-touch-icon.png',
+          href: '/icon-180.png',
         },
         {
           rel: 'manifest',

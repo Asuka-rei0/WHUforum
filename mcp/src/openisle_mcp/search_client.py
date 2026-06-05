@@ -114,6 +114,7 @@ class SearchClient:
         token: str,
         content: str,
         captcha: str | None = None,
+        anonymous: bool | None = None,
     ) -> dict[str, Any]:
         """Reply to an existing comment and return the created reply."""
 
@@ -125,6 +126,8 @@ class SearchClient:
             stripped_captcha = captcha.strip()
             if stripped_captcha:
                 payload["captcha"] = stripped_captcha
+        if anonymous is not None:
+            payload["anonymous"] = anonymous
 
         logger.debug(
             "Posting reply to comment_id=%s (captcha=%s)",
@@ -147,6 +150,7 @@ class SearchClient:
         token: str,
         content: str,
         captcha: str | None = None,
+        anonymous: bool | None = None,
     ) -> dict[str, Any]:
         """Create a comment on a post and return the backend payload."""
 
@@ -158,6 +162,8 @@ class SearchClient:
             stripped_captcha = captcha.strip()
             if stripped_captcha:
                 payload["captcha"] = stripped_captcha
+        if anonymous is not None:
+            payload["anonymous"] = anonymous
 
         logger.debug(
             "Posting comment to post_id=%s (captcha=%s)",

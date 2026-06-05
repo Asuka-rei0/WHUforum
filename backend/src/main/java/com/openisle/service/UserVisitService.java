@@ -26,6 +26,11 @@ public class UserVisitService {
 
   private final RedisTemplate redisTemplate;
 
+  public void recordActiveUser(String username) {
+    String key = CachingConfig.VISIT_CACHE_NAME + ":" + LocalDate.now();
+    redisTemplate.opsForSet().add(key, username);
+  }
+
   public boolean recordVisit(String username) {
     User user = userRepository
       .findByUsername(username)

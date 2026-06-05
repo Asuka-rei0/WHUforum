@@ -184,6 +184,13 @@ async def reply_to_post(
             description="Optional captcha solution if the backend requires it.",
         ),
     ] = None,
+    anonymous: Annotated[
+        bool | None,
+        PydanticField(
+            default=None,
+            description="Whether to publish the comment with an anonymous campus alias.",
+        ),
+    ] = None,
     ctx: Context | None = None,
 ) -> CommentCreateResult:
     """Create a comment on a post and return the backend payload."""
@@ -193,6 +200,7 @@ async def reply_to_post(
         raise ValueError("Reply content must not be empty.")
 
     sanitized_captcha = captcha.strip() if isinstance(captcha, str) else None
+    sanitized_anonymous = bool(anonymous) if isinstance(anonymous, bool) else None
 
     request_token = _extract_authorization_token(ctx)
 
@@ -207,6 +215,7 @@ async def reply_to_post(
             token=request_token,
             content=sanitized_content,
             captcha=sanitized_captcha,
+            anonymous=sanitized_anonymous,
         )
     except httpx.HTTPStatusError as exc:  # pragma: no cover - network errors
         status_code = exc.response.status_code
@@ -285,6 +294,13 @@ async def reply_to_comment(
             description="Optional captcha solution if the backend requires it.",
         ),
     ] = None,
+    anonymous: Annotated[
+        bool | None,
+        PydanticField(
+            default=None,
+            description="Whether to publish the reply with an anonymous campus alias.",
+        ),
+    ] = None,
     ctx: Context | None = None,
 ) -> CommentReplyResult:
     """Create a reply for a comment and return the backend payload."""
@@ -294,6 +310,7 @@ async def reply_to_comment(
         raise ValueError("Reply content must not be empty.")
 
     sanitized_captcha = captcha.strip() if isinstance(captcha, str) else None
+    sanitized_anonymous = bool(anonymous) if isinstance(anonymous, bool) else None
 
     request_token = _extract_authorization_token(ctx)
 
@@ -308,6 +325,7 @@ async def reply_to_comment(
             token=request_token,
             content=sanitized_content,
             captcha=sanitized_captcha,
+            anonymous=sanitized_anonymous,
         )
     except httpx.HTTPStatusError as exc:  # pragma: no cover - network errors
         status_code = exc.response.status_code
@@ -405,6 +423,42 @@ async def create_post(
         PydanticField(
             default=None,
             description="Optional visibility scope for the post.",
+        ),
+    ] = None,
+    anonymous: Annotated[
+        bool | None,
+        PydanticField(
+            default=None,
+            description="Whether to publish the post with an anonymous campus alias.",
+        ),
+    ] = None,
+    flea_market: Annotated[
+        bool | None,
+        PydanticField(
+            default=None,
+            description="Whether this post should create a campus flea market item.",
+        ),
+    ] = None,
+    flea_price: Annotated[
+        float | None,
+        PydanticField(
+            default=None,
+            ge=0,
+            description="Optional listed price for a flea market item.",
+        ),
+    ] = None,
+    flea_trade_location: Annotated[
+        str | None,
+        PydanticField(
+            default=None,
+            description="Preferred transaction location for a flea market item.",
+        ),
+    ] = None,
+    flea_contact: Annotated[
+        str | None,
+        PydanticField(
+            default=None,
+            description="Seller contact information for a flea market item.",
         ),
     ] = None,
     prize_description: Annotated[
@@ -542,6 +596,30 @@ async def create_post(
     if sanitized_visible_scope == "":
         sanitized_visible_scope = None
 
+    sanitized_anonymous = bool(anonymous) if isinstance(anonymous, bool) else None
+    sanitized_flea_market = bool(flea_market) if isinstance(flea_market, bool) else None
+
+    sanitized_flea_price: float | None = None
+    if flea_price is not None:
+        try:
+            sanitized_flea_price = float(flea_price)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Flea market price must be a number.") from exc
+        if sanitized_flea_price < 0:
+            raise ValueError("Flea market price cannot be negative.")
+
+    sanitized_flea_trade_location = (
+        flea_trade_location.strip() if isinstance(flea_trade_location, str) else None
+    )
+    if sanitized_flea_trade_location == "":
+        sanitized_flea_trade_location = None
+
+    sanitized_flea_contact = (
+        flea_contact.strip() if isinstance(flea_contact, str) else None
+    )
+    if sanitized_flea_contact == "":
+        sanitized_flea_contact = None
+
     sanitized_prize_description = (
         prize_description.strip() if isinstance(prize_description, str) else None
     )
@@ -624,6 +702,16 @@ async def create_post(
         payload["type"] = sanitized_post_type
     if sanitized_visible_scope is not None:
         payload["postVisibleScopeType"] = sanitized_visible_scope
+    if sanitized_anonymous is not None:
+        payload["anonymous"] = sanitized_anonymous
+    if sanitized_flea_market is not None:
+        payload["fleaMarket"] = sanitized_flea_market
+    if sanitized_flea_price is not None:
+        payload["fleaPrice"] = sanitized_flea_price
+    if sanitized_flea_trade_location is not None:
+        payload["fleaTradeLocation"] = sanitized_flea_trade_location
+    if sanitized_flea_contact is not None:
+        payload["fleaContact"] = sanitized_flea_contact
     if sanitized_prize_description is not None:
         payload["prizeDescription"] = sanitized_prize_description
     if sanitized_prize_icon is not None:

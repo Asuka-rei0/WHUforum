@@ -49,7 +49,7 @@ class StatControllerTest {
     user.setUsername("user");
     user.setPassword("p");
     user.setEmail("u@example.com");
-    user.setRole(Role.USER);
+    user.setRole(Role.ADMIN);
     Mockito.when(userRepository.findByUsername("user")).thenReturn(Optional.of(user));
     Mockito.when(userVisitService.countDau(Mockito.any())).thenReturn(3L);
 
@@ -66,7 +66,7 @@ class StatControllerTest {
     user.setUsername("user");
     user.setPassword("p");
     user.setEmail("u@example.com");
-    user.setRole(Role.USER);
+    user.setRole(Role.ADMIN);
     Mockito.when(userRepository.findByUsername("user")).thenReturn(Optional.of(user));
     java.util.Map<java.time.LocalDate, Long> map = new java.util.LinkedHashMap<>();
     map.put(java.time.LocalDate.now().minusDays(1), 1L);
@@ -89,7 +89,7 @@ class StatControllerTest {
     user.setUsername("user");
     user.setPassword("p");
     user.setEmail("u@example.com");
-    user.setRole(Role.USER);
+    user.setRole(Role.ADMIN);
     Mockito.when(userRepository.findByUsername("user")).thenReturn(Optional.of(user));
     java.util.Map<java.time.LocalDate, Long> map = new java.util.LinkedHashMap<>();
     map.put(java.time.LocalDate.now().minusDays(1), 5L);
@@ -112,7 +112,7 @@ class StatControllerTest {
     user.setUsername("user");
     user.setPassword("p");
     user.setEmail("u@example.com");
-    user.setRole(Role.USER);
+    user.setRole(Role.ADMIN);
     Mockito.when(userRepository.findByUsername("user")).thenReturn(Optional.of(user));
     java.util.Map<java.time.LocalDate, Long> map = new java.util.LinkedHashMap<>();
     map.put(java.time.LocalDate.now().minusDays(1), 7L);
@@ -135,7 +135,7 @@ class StatControllerTest {
     user.setUsername("user");
     user.setPassword("p");
     user.setEmail("u@example.com");
-    user.setRole(Role.USER);
+    user.setRole(Role.ADMIN);
     Mockito.when(userRepository.findByUsername("user")).thenReturn(Optional.of(user));
     java.util.Map<java.time.LocalDate, Long> map = new java.util.LinkedHashMap<>();
     map.put(java.time.LocalDate.now().minusDays(1), 9L);

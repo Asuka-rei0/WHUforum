@@ -39,6 +39,20 @@ public class UserMapper {
     dto.setAvatar(user.getAvatar());
     dto.setDisplayMedal(user.getDisplayMedal());
     dto.setBot(user.isBot());
+    dto.setCampusVerified(user.isCampusVerified());
+    dto.setCampusPersonType(
+      user.getCampusPersonType() != null ? user.getCampusPersonType().name() : null
+    );
+    dto.setDepartment(user.getDepartment());
+    return dto;
+  }
+
+  public AuthorDto toAnonymousAuthorDto(String alias) {
+    AuthorDto dto = new AuthorDto();
+    dto.setUsername(alias == null || alias.isBlank() ? "珞珈匿名" : alias);
+    dto.setAvatar("/whu-emblem.webp");
+    dto.setAnonymous(true);
+    dto.setCampusVerified(true);
     return dto;
   }
 
@@ -66,6 +80,11 @@ public class UserMapper {
     dto.setCurrentLevel(levelService.getLevel(user.getExperience()));
     dto.setNextLevelExp(levelService.nextLevelExp(user.getExperience()));
     dto.setBot(user.isBot());
+    dto.setCampusVerified(user.isCampusVerified());
+    dto.setCampusPersonType(
+      user.getCampusPersonType() != null ? user.getCampusPersonType().name() : null
+    );
+    dto.setDepartment(user.getDepartment());
     if (viewer != null) {
       dto.setSubscribed(subscriptionService.isSubscribed(viewer.getName(), user.getUsername()));
     } else {

@@ -2,6 +2,7 @@ package com.openisle.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.openisle.config.CachingConfig;
 import com.openisle.model.Role;
 import com.openisle.model.User;
 import com.openisle.repository.UserRepository;
@@ -14,12 +15,13 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 
 /** Integration tests for review publish mode. */
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-  properties = { "app.post.publish-mode=REVIEW", "app.register.mode=DIRECT" }
+  properties = { "app.post.publish-mode=REVIEW", "app.register.mode=DIRECT", "app.whu.mode=false" }
 )
 class PublishModeIntegrationTest {
 
@@ -28,6 +30,9 @@ class PublishModeIntegrationTest {
 
   @Autowired
   private UserRepository users;
+
+  @Autowired
+  private RedisTemplate<String, Object> redisTemplate;
 
   @MockBean
   private EmailSender emailService;
@@ -53,16 +58,14 @@ class PublishModeIntegrationTest {
       Map.class
     );
     User u = users.findByUsername(username).orElseThrow();
-    if (u.getVerificationCode() != null) {
-      rest.postForEntity(
-        "/api/auth/verify",
-        new HttpEntity<>(Map.of("username", username, "code", u.getVerificationCode()), h),
-        Map.class
-      );
+    if (!u.isVerified()) {
+      u.setVerified(true);
+      users.save(u);
     }
+    redisTemplate.delete(CachingConfig.LIMIT_CACHE_NAME + ":posts:" + username);
     ResponseEntity<Map> resp = rest.postForEntity(
       "/api/auth/login",
-      new HttpEntity<>(Map.of("username", username, "password", "pass123"), h),
+      new HttpEntity<>(Map.of("email", email, "password", "pass123"), h),
       Map.class
     );
     return (String) resp.getBody().get("token");
@@ -91,8 +94,8 @@ class PublishModeIntegrationTest {
 
   @Test
   void postRequiresApproval() {
-    String userToken = registerAndLogin("eve123", "e@example.com");
-    String adminToken = registerAndLoginAsAdmin("admin1", "admin@example.com");
+    String userToken = registerAndLogin("eve123", "eve123@whu.edu.cn");
+    String adminToken = registerAndLoginAsAdmin("admin1", "admin1@whu.edu.cn");
 
     ResponseEntity<Map> catResp = postJson(
       "/api/categories",

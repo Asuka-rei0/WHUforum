@@ -1,12 +1,14 @@
 package com.openisle.service;
 
 import com.openisle.config.CachingConfig;
+import com.openisle.exception.EmailSendException;
 import com.openisle.exception.NotFoundException;
 import com.openisle.exception.RateLimitException;
 import com.openisle.model.*;
 import com.openisle.repository.CategoryProposalPostRepository;
 import com.openisle.repository.CategoryRepository;
 import com.openisle.repository.CommentRepository;
+import com.openisle.repository.FleaMarketItemRepository;
 import com.openisle.repository.LotteryPostRepository;
 import com.openisle.repository.NotificationRepository;
 import com.openisle.repository.PointHistoryRepository;
@@ -19,7 +21,6 @@ import com.openisle.repository.TagRepository;
 import com.openisle.repository.UserRepository;
 import com.openisle.search.SearchIndexEventPublisher;
 import com.openisle.service.EmailSender;
-import com.openisle.exception.EmailSendException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -73,6 +74,9 @@ public class PostService {
   private final PostChangeLogService postChangeLogService;
   private final PointHistoryRepository pointHistoryRepository;
   private final CategoryService categoryService;
+  private final FleaMarketItemRepository fleaMarketItemRepository;
+  private final AnonymousAuditService anonymousAuditService;
+  private final ModerationService moderationService;
   private final ConcurrentMap<Long, ScheduledFuture<?>> scheduledFinalizations =
     new ConcurrentHashMap<>();
 
@@ -116,7 +120,10 @@ public class PostService {
     @Value("${app.post.publish-mode:DIRECT}") PublishMode publishMode,
     RedisTemplate redisTemplate,
     SearchIndexEventPublisher searchIndexEventPublisher,
-    CategoryService categoryService
+    CategoryService categoryService,
+    FleaMarketItemRepository fleaMarketItemRepository,
+    AnonymousAuditService anonymousAuditService,
+    ModerationService moderationService
   ) {
     this.postRepository = postRepository;
     this.userRepository = userRepository;
@@ -146,6 +153,9 @@ public class PostService {
     this.redisTemplate = redisTemplate;
     this.searchIndexEventPublisher = searchIndexEventPublisher;
     this.categoryService = categoryService;
+    this.fleaMarketItemRepository = fleaMarketItemRepository;
+    this.anonymousAuditService = anonymousAuditService;
+    this.moderationService = moderationService;
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -264,7 +274,12 @@ public class PostService {
     java.util.List<String> options,
     Boolean multiple,
     String proposedName,
-    String proposalDescription
+    String proposalDescription,
+    Boolean anonymous,
+    Boolean fleaMarket,
+    java.math.BigDecimal fleaPrice,
+    String fleaTradeLocation,
+    String fleaContact
   ) {
     // 限制访问次数
     boolean limitResult = isPostLimitReached(username);
@@ -338,8 +353,16 @@ public class PostService {
     post.setAuthor(author);
     post.setCategory(category);
     post.setTags(new HashSet<>(tags));
-    post.setStatus(publishMode == PublishMode.REVIEW ? PostStatus.PENDING : PostStatus.PUBLISHED);
+    ModerationService.ModerationResult moderation = moderationService.inspect(
+      title + "\n" + content
+    );
+    boolean needsReview = publishMode == PublishMode.REVIEW || moderation.flagged();
+    post.setStatus(needsReview ? PostStatus.PENDING : PostStatus.PUBLISHED);
     post.setLastReplyAt(LocalDateTime.now());
+    post.setAnonymous(Boolean.TRUE.equals(anonymous));
+    if (post.isAnonymous()) {
+      post.setAnonymousAlias(anonymousAuditService.createAlias());
+    }
 
     // 什么都没设置的情况下，默认为ALL
     if (Objects.isNull(postVisibleScopeType)) {
@@ -358,6 +381,17 @@ public class PostService {
       post = postRepository.save(post);
     }
     imageUploader.addReferences(imageUploader.extractUrls(content));
+    if (post.isAnonymous()) {
+      anonymousAuditService.recordPost(post, author, post.getAnonymousAlias(), "anonymous post");
+    }
+    if (Boolean.TRUE.equals(fleaMarket)) {
+      FleaMarketItem item = new FleaMarketItem();
+      item.setPost(post);
+      item.setPrice(fleaPrice);
+      item.setTradeLocation(StringUtils.trimToNull(fleaTradeLocation));
+      item.setContact(StringUtils.trimToNull(fleaContact));
+      fleaMarketItemRepository.save(item);
+    }
     if (post.getStatus() == PostStatus.PENDING) {
       java.util.List<User> admins = userRepository.findByRole(com.openisle.model.Role.ADMIN);
       for (User admin : admins) {
@@ -382,6 +416,20 @@ public class PostService {
         null,
         null
       );
+    }
+    if (moderation.flagged()) {
+      for (User admin : userRepository.findByRole(com.openisle.model.Role.ADMIN)) {
+        notificationService.createNotification(
+          admin,
+          NotificationType.MODERATION_ALERT,
+          post,
+          null,
+          moderation.crisis(),
+          author,
+          null,
+          "帖子触发敏感词: " + moderation.matchedWord()
+        );
+      }
     }
     // notify followers of author
     for (User u : subscriptionService.getSubscribers(author.getUsername())) {
@@ -544,6 +592,12 @@ public class PostService {
 
   public PollPost getPoll(Long postId) {
     return pollPostRepository
+      .findById(postId)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
+  }
+
+  public Post getPost(Long postId) {
+    return postRepository
       .findById(postId)
       .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
   }
@@ -813,7 +867,10 @@ public class PostService {
     Pageable pageable = buildPageable(page, pageSize);
 
     if (!hasCategories && !hasTags) {
-      posts = postRepository.findByStatusOrderByPinnedAtDescViewsDesc(PostStatus.PUBLISHED, pageable);
+      posts = postRepository.findByStatusOrderByPinnedAtDescViewsDesc(
+        PostStatus.PUBLISHED,
+        pageable
+      );
     } else if (hasCategories) {
       java.util.List<Category> categories = categoryRepository.findAllById(categoryIds);
       if (categories.isEmpty()) {
@@ -1282,6 +1339,7 @@ public class PostService {
     if (!user.getId().equals(author.getId()) && user.getRole() != Role.ADMIN) {
       throw new IllegalArgumentException("Unauthorized");
     }
+    fleaMarketItemRepository.findByPost(post).ifPresent(fleaMarketItemRepository::delete);
     for (Comment c : commentRepository.findByPostAndParentIsNullOrderByCreatedAtAsc(post)) {
       commentService.deleteCommentCascade(c);
     }
@@ -1333,6 +1391,89 @@ public class PostService {
         title
       );
     }
+  }
+
+  @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
+  @Transactional
+  public FleaMarketItem expressFleaMarketInterest(Long postId, String username) {
+    User buyer = userRepository
+      .findByUsername(username)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+    FleaMarketItem item = fleaMarketItemRepository
+      .findByPost_Id(postId)
+      .orElseThrow(() ->
+        new com.openisle.exception.NotFoundException("Flea market item not found")
+      );
+    if (item.getPost().getAuthor().getId().equals(buyer.getId())) {
+      throw new IllegalArgumentException("Author cannot buy own item");
+    }
+    if (item.getStatus() != FleaMarketStatus.AVAILABLE) {
+      throw new IllegalStateException("Item is not available");
+    }
+    item.setStatus(FleaMarketStatus.IN_TRANSACTION);
+    item.setBuyer(buyer);
+    FleaMarketItem saved = fleaMarketItemRepository.save(item);
+    notificationService.createNotification(
+      item.getPost().getAuthor(),
+      NotificationType.FLEA_MARKET_STATUS,
+      item.getPost(),
+      null,
+      null,
+      buyer,
+      null,
+      "有人对你的二手物品发起交易意向"
+    );
+    return saved;
+  }
+
+  @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
+  @Transactional
+  public FleaMarketItem updateFleaMarketStatus(
+    Long postId,
+    String username,
+    FleaMarketStatus status
+  ) {
+    if (status == null) {
+      throw new IllegalArgumentException("Status is required");
+    }
+    User operator = userRepository
+      .findByUsername(username)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+    FleaMarketItem item = fleaMarketItemRepository
+      .findByPost_Id(postId)
+      .orElseThrow(() ->
+        new com.openisle.exception.NotFoundException("Flea market item not found")
+      );
+    if (
+      !operator.getId().equals(item.getPost().getAuthor().getId()) &&
+      operator.getRole() != Role.ADMIN
+    ) {
+      throw new IllegalArgumentException("Unauthorized");
+    }
+    if (item.getStatus() == FleaMarketStatus.OFF_SHELF && operator.getRole() != Role.ADMIN) {
+      throw new IllegalStateException("Item is already off shelf");
+    }
+    if (item.getStatus() == FleaMarketStatus.AVAILABLE && status == FleaMarketStatus.OFF_SHELF) {
+      item.setBuyer(null);
+    }
+    if (status == FleaMarketStatus.AVAILABLE) {
+      item.setBuyer(null);
+    }
+    item.setStatus(status);
+    FleaMarketItem saved = fleaMarketItemRepository.save(item);
+    if (saved.getBuyer() != null) {
+      notificationService.createNotification(
+        saved.getBuyer(),
+        NotificationType.FLEA_MARKET_STATUS,
+        saved.getPost(),
+        null,
+        null,
+        operator,
+        null,
+        "二手物品状态更新为 " + status.name()
+      );
+    }
+    return saved;
   }
 
   public java.util.List<Post> getPostsByIds(java.util.List<Long> ids) {

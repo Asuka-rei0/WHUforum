@@ -623,6 +623,34 @@
                       </span>
                     </NotificationContainer>
                   </template>
+                  <template v-else-if="item.type === 'FLEA_MARKET_STATUS'">
+                    <NotificationContainer :item="item" :markRead="markRead">
+                      跳蚤市场状态更新：
+                      <NuxtLink
+                        v-if="item.post"
+                        class="notif-content-text"
+                        @click="markRead(item.id)"
+                        :to="`/posts/${item.post.id}`"
+                      >
+                        {{ stripMarkdownLength(item.post.title, 100) }}
+                      </NuxtLink>
+                      <span v-if="item.content">，{{ item.content }}</span>
+                    </NotificationContainer>
+                  </template>
+                  <template v-else-if="item.type === 'MODERATION_ALERT'">
+                    <NotificationContainer :item="item" :markRead="markRead">
+                      内容审核提醒：
+                      <NuxtLink
+                        v-if="item.post"
+                        class="notif-content-text"
+                        @click="markRead(item.id)"
+                        :to="`/posts/${item.post.id}`"
+                      >
+                        {{ stripMarkdownLength(item.post.title, 100) }}
+                      </NuxtLink>
+                      <span v-if="item.content">，{{ item.content }}</span>
+                    </NotificationContainer>
+                  </template>
                   <template v-else>
                     <NotificationContainer :item="item" :markRead="markRead">
                       {{ formatType(item.type) }}
@@ -813,6 +841,10 @@ const formatType = (t) => {
       return '帖子被删除'
     case 'POST_FEATURED':
       return '文章被精选'
+    case 'FLEA_MARKET_STATUS':
+      return '跳蚤市场状态更新'
+    case 'MODERATION_ALERT':
+      return '内容审核提醒'
     case 'POLL_VOTE':
       return '有人参与你的投票'
     case 'POLL_RESULT_OWNER':
@@ -835,6 +867,7 @@ const needAdminSet = new Set([
   'REGISTER_REQUEST',
   'POINT_REDEEM',
   'ACTIVITY_REDEEM',
+  'MODERATION_ALERT',
 ])
 
 const canShowNotification = (type) => {

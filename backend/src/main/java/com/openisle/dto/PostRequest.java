@@ -1,10 +1,10 @@
 package com.openisle.dto;
 
 import com.openisle.model.PostType;
+import com.openisle.model.PostVisibleScopeType;
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
-
-import com.openisle.model.PostVisibleScopeType;
 import lombok.Data;
 
 /**
@@ -35,4 +35,11 @@ public class PostRequest {
   // fields for category proposal posts
   private String proposedName;
   private String proposalDescription;
+
+  // campus forum fields
+  private Boolean anonymous;
+  private Boolean fleaMarket;
+  private BigDecimal fleaPrice;
+  private String fleaTradeLocation;
+  private String fleaContact;
 }

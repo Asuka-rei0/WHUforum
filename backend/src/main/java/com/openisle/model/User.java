@@ -65,6 +65,25 @@ public class User {
   @Column(name = "is_bot", nullable = false)
   private boolean bot = false;
 
+  @Column(name = "cas_subject", unique = true)
+  private String casSubject;
+
+  @Column(name = "campus_id_hash", unique = true)
+  private String campusIdHash;
+
+  @Column(name = "encrypted_campus_id", length = 512)
+  private String encryptedCampusId;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "campus_person_type")
+  private CampusPersonType campusPersonType = CampusPersonType.UNKNOWN;
+
+  @Column(name = "department", length = 200)
+  private String department;
+
+  @Column(name = "campus_verified", nullable = false)
+  private boolean campusVerified = false;
+
   @Enumerated(EnumType.STRING)
   private MedalType displayMedal;
 

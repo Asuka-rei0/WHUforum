@@ -2,12 +2,12 @@ package com.openisle.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openisle.dto.NotificationPreferenceDto;
+import com.openisle.exception.EmailSendException;
 import com.openisle.model.*;
 import com.openisle.repository.NotificationRepository;
 import com.openisle.repository.ReactionRepository;
 import com.openisle.repository.UserRepository;
 import com.openisle.service.EmailSender;
-import com.openisle.exception.EmailSendException;
 import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -223,7 +223,7 @@ public class NotificationService {
    */
   @org.springframework.transaction.annotation.Transactional
   public void createPointRedeemNotifications(User user, String content) {
-    //        notificationRepository.deleteByTypeAndFromUser(NotificationType.POINT_REDEEM, user);
+    notificationRepository.deleteByTypeAndFromUser(NotificationType.POINT_REDEEM, user);
     for (User admin : userRepository.findByRole(Role.ADMIN)) {
       createNotification(
         admin,

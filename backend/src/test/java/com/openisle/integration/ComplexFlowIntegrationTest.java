@@ -2,6 +2,7 @@ package com.openisle.integration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.openisle.config.CachingConfig;
 import com.openisle.controller.ActivityController;
 import com.openisle.model.Role;
 import com.openisle.model.User;
@@ -16,11 +17,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-  properties = "app.register.mode=DIRECT"
+  properties = { "app.register.mode=DIRECT", "app.whu.mode=false" }
 )
 class ComplexFlowIntegrationTest {
 
@@ -29,6 +31,9 @@ class ComplexFlowIntegrationTest {
 
   @Autowired
   private UserRepository users;
+
+  @Autowired
+  private RedisTemplate<String, Object> redisTemplate;
 
   @MockBean
   private EmailSender emailService;
@@ -54,16 +59,14 @@ class ComplexFlowIntegrationTest {
       Map.class
     );
     User u = users.findByUsername(username).orElseThrow();
-    if (u.getVerificationCode() != null) {
-      rest.postForEntity(
-        "/api/auth/verify",
-        new HttpEntity<>(Map.of("username", username, "code", u.getVerificationCode()), h),
-        Map.class
-      );
+    if (!u.isVerified()) {
+      u.setVerified(true);
+      users.save(u);
     }
+    redisTemplate.delete(CachingConfig.LIMIT_CACHE_NAME + ":posts:" + username);
     ResponseEntity<Map> resp = rest.postForEntity(
       "/api/auth/login",
-      new HttpEntity<>(Map.of("username", username, "password", "pass123"), h),
+      new HttpEntity<>(Map.of("email", email, "password", "pass123"), h),
       Map.class
     );
     return (String) resp.getBody().get("token");
@@ -86,10 +89,10 @@ class ComplexFlowIntegrationTest {
 
   @Test
   void nestedCommentsVisibleInPost() {
-    String t1 = registerAndLogin("alice1", "a@example.com");
-    String t2 = registerAndLogin("bob123", "b@example.com");
+    String t1 = registerAndLogin("alice1", "alice1@whu.edu.cn");
+    String t2 = registerAndLogin("bob123", "bob123@whu.edu.cn");
 
-    String adminToken = registerAndLoginAsAdmin("admin1", "admin@example.com");
+    String adminToken = registerAndLoginAsAdmin("admin1", "admin1@whu.edu.cn");
     ResponseEntity<Map> catResp = postJson(
       "/api/categories",
       Map.of("name", "general", "description", "d", "icon", "i"),
@@ -144,10 +147,10 @@ class ComplexFlowIntegrationTest {
 
   @Test
   void reactionsReturnedForPostAndComment() {
-    String t1 = registerAndLogin("carol1", "c@example.com");
-    String t2 = registerAndLogin("dave01", "d@example.com");
+    String t1 = registerAndLogin("carol1", "carol1@whu.edu.cn");
+    String t2 = registerAndLogin("dave01", "dave01@whu.edu.cn");
 
-    String adminToken = registerAndLoginAsAdmin("admin2", "admin2@example.com");
+    String adminToken = registerAndLoginAsAdmin("admin2", "admin2@whu.edu.cn");
     List<Map<String, Object>> categories = (List<Map<String, Object>>) rest.getForObject(
       "/api/categories",
       List.class

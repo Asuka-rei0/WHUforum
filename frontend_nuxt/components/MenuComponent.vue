@@ -201,6 +201,9 @@ const emit = defineEmits(['item-click'])
 const categoryOpen = ref(true)
 const tagOpen = ref(true)
 const myPoint = ref(null)
+const isPlaceholderTaxonomy = (item) => /^测试用/.test(item?.name || '')
+const filterCampusTaxonomy = (items) =>
+  Array.isArray(items) ? items.filter((item) => !isPlaceholderTaxonomy(item)) : []
 
 /** ✅ 用 useAsyncData 替换原生 fetch，避免 SSR+CSR 二次请求 */
 const {
@@ -210,7 +213,7 @@ const {
 } = await useAsyncData(
   // 稳定 key：避免 hydration 期误判
   'menu:categories',
-  () => $fetch(`${API_BASE_URL}/api/categories`),
+  () => $fetch(`${API_BASE_URL}/api/categories`).then(filterCampusTaxonomy),
   {
     server: true, // SSR 预取
     default: () => [], // 初始默认值，减少空判断
@@ -234,7 +237,7 @@ const buildTagUrl = (page = 0) => {
 
 const fetchTagPage = async (page = 0) => {
   try {
-    return await $fetch(buildTagUrl(page))
+    return filterCampusTaxonomy(await $fetch(buildTagUrl(page)))
   } catch (e) {
     console.error('Failed to fetch tags', e)
     return []

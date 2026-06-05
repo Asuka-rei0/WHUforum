@@ -84,6 +84,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { getToken, authState } from '~/utils/auth'
 import { toast } from '~/main'
+import { getApiErrorMessage } from '~/utils/apiError'
 import { useRuntimeConfig } from '#imports'
 import { useIsMobile } from '~/utils/screen'
 import { useCountdown } from '~/composables/useCountdown'
@@ -124,7 +125,7 @@ const joinLottery = async () => {
     toast.success('已参与抽奖')
     emit('refresh')
   } else {
-    toast.error(data.error || '操作失败')
+    toast.error(getApiErrorMessage(data, '参与抽奖失败，请稍后再试'))
   }
 }
 </script>

@@ -126,6 +126,7 @@
 import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 import { getToken, authState } from '~/utils/auth'
 import { toast } from '~/main'
+import { getApiErrorMessage } from '~/utils/apiError'
 import { useRuntimeConfig } from '#imports'
 import { useCountdown } from '~/composables/useCountdown'
 import BaseUserAvatar from '~/components/BaseUserAvatar.vue'
@@ -183,7 +184,7 @@ const voteOption = async (idx) => {
     emit('refresh')
     showPollResult.value = true
   } else {
-    toast.error(data.error || '操作失败')
+    toast.error(getApiErrorMessage(data, '投票失败，请稍后再试'))
   }
 }
 
@@ -229,7 +230,7 @@ const submitMultiPoll = async () => {
     emit('refresh')
     showPollResult.value = true
   } else {
-    toast.error(data.error || '操作失败')
+    toast.error(getApiErrorMessage(data, '投票失败，请稍后再试'))
   }
 }
 </script>

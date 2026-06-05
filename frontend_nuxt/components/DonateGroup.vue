@@ -58,6 +58,7 @@
 import { Finance } from '@icon-park/vue-next'
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { toast } from '~/main'
+import { getApiErrorMessage } from '~/utils/apiError'
 import { authState, getToken } from '~/utils/auth'
 
 const financing = Finance
@@ -174,7 +175,7 @@ const handleDonate = async (amount) => {
       if (res.status === 401) {
         toast.error('请先登录后再打赏')
       } else {
-        toast.error(data?.error || '打赏失败')
+        toast.error(getApiErrorMessage(data, '打赏失败，请稍后再试'))
       }
       return
     }

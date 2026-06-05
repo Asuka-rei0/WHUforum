@@ -8,4 +8,5 @@ public class CommentRequest {
 
   private String content;
   private String captcha;
+  private Boolean anonymous;
 }

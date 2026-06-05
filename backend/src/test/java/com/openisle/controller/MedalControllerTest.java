@@ -16,6 +16,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(MedalController.class)
@@ -61,7 +62,7 @@ class MedalControllerTest {
         post("/api/medals/select")
           .contentType(MediaType.APPLICATION_JSON)
           .content("{\"type\":\"COMMENT\"}")
-          .principal(() -> "user")
+          .principal(new UsernamePasswordAuthenticationToken("user", "p"))
       )
       .andExpect(status().isOk());
   }
@@ -76,7 +77,7 @@ class MedalControllerTest {
         post("/api/medals/select")
           .contentType(MediaType.APPLICATION_JSON)
           .content("{\"type\":\"COMMENT\"}")
-          .principal(() -> "user")
+          .principal(new UsernamePasswordAuthenticationToken("user", "p"))
       )
       .andExpect(status().isBadRequest());
   }

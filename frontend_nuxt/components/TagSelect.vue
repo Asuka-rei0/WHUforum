@@ -58,6 +58,9 @@ const props = defineProps({
 const dropdownRef = ref(null)
 const localTags = ref([])
 const providedTags = ref(Array.isArray(props.options) ? [...props.options] : [])
+const isPlaceholderTaxonomy = (item) => /^测试用/.test(item?.name || '')
+const filterCampusTaxonomy = (items) =>
+  Array.isArray(items) ? items.filter((item) => !isPlaceholderTaxonomy(item)) : []
 
 const TAG_PAGE_SIZE = 10
 const remoteState = reactive({
@@ -102,7 +105,7 @@ const fetchRemoteTags = async (kw = '', page = 0) => {
     const res = await fetch(url)
     if (res.ok) {
       const data = await res.json()
-      return Array.isArray(data) ? data : []
+      return filterCampusTaxonomy(data)
     }
     throw new Error('failed to fetch tags')
   } catch (e) {

@@ -14,4 +14,8 @@ public class AuthorDto {
   private String avatar;
   private MedalType displayMedal;
   private boolean bot;
+  private boolean anonymous;
+  private boolean campusVerified;
+  private String campusPersonType;
+  private String department;
 }

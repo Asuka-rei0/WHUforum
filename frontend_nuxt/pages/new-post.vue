@@ -11,7 +11,7 @@
           <CategorySelect v-model="selectedCategory" />
           <TagSelect v-model="selectedTags" creatable />
           <PostTypeSelect v-model="postType" />
-          <PostVisibleScopeSelect v-model="postVisibleScope"/>
+          <PostVisibleScopeSelect v-model="postVisibleScope" />
         </div>
         <div class="post-options-right">
           <div class="post-clear" @click="clearPost"><clear-icon /> 清空</div>
@@ -36,6 +36,28 @@
           </div>
         </div>
       </div>
+      <div class="campus-options">
+        <label class="campus-option-item">
+          <input v-model="anonymous" type="checkbox" />
+          <span>匿名发布</span>
+        </label>
+        <label class="campus-option-item">
+          <input v-model="fleaMarket" type="checkbox" />
+          <span>跳蚤市场物品</span>
+        </label>
+        <div v-if="fleaMarket" class="flea-fields">
+          <input
+            v-model="fleaPrice"
+            class="flea-input"
+            type="number"
+            min="0"
+            step="0.01"
+            placeholder="价格"
+          />
+          <input v-model="fleaTradeLocation" class="flea-input" placeholder="交易地点" />
+          <input v-model="fleaContact" class="flea-input" placeholder="联系方式" />
+        </div>
+      </div>
       <LotteryForm v-if="postType === 'LOTTERY'" :data="lottery" />
       <PollForm v-if="postType === 'POLL'" :data="poll" />
       <ProposalForm v-if="postType === 'PROPOSAL'" :data="proposal" />
@@ -54,6 +76,7 @@ import LotteryForm from '~/components/LotteryForm.vue'
 import PollForm from '~/components/PollForm.vue'
 import ProposalForm from '~/components/ProposalForm.vue'
 import { toast } from '~/main'
+import { getApiErrorMessage } from '~/utils/apiError'
 import { authState, getToken } from '~/utils/auth'
 import PostVisibleScopeSelect from '~/components/PostVisibleScopeSelect.vue'
 const config = useRuntimeConfig()
@@ -85,6 +108,11 @@ const proposal = reactive({
   proposedName: '',
   proposalDescription: '',
 })
+const anonymous = ref(false)
+const fleaMarket = ref(false)
+const fleaPrice = ref('')
+const fleaTradeLocation = ref('')
+const fleaContact = ref('')
 const startTime = ref(null)
 const isWaitingPosting = ref(false)
 const isAiLoading = ref(false)
@@ -136,6 +164,11 @@ const clearPost = async () => {
   poll.multiple = false
   proposal.proposedName = ''
   proposal.proposalDescription = ''
+  anonymous.value = false
+  fleaMarket.value = false
+  fleaPrice.value = ''
+  fleaTradeLocation.value = ''
+  fleaContact.value = ''
 
   // 删除草稿
   const token = getToken()
@@ -173,7 +206,7 @@ const saveDraft = async () => {
         content: content.value,
         categoryId: selectedCategory.value || null,
         tagIds,
-        postVisibleScopeType:postVisibleScope.value
+        postVisibleScopeType: postVisibleScope.value,
       }),
     })
     if (res.ok) {
@@ -209,7 +242,7 @@ const ensureTags = async (token) => {
         } catch (e) {
           data = null
         }
-        toast.error((data && data.error) || '创建标签失败')
+        toast.error(getApiErrorMessage(data, '创建标签失败'))
         throw new Error('create tag failed')
       }
     }
@@ -303,6 +336,20 @@ const submitPost = async () => {
       return
     }
   }
+  if (fleaMarket.value) {
+    if (fleaPrice.value !== '' && Number(fleaPrice.value) < 0) {
+      toast.error('价格不能小于 0')
+      return
+    }
+    if (!fleaTradeLocation.value.trim()) {
+      toast.error('请填写交易地点')
+      return
+    }
+    if (!fleaContact.value.trim()) {
+      toast.error('请填写联系方式')
+      return
+    }
+  }
   try {
     const token = getToken()
     await ensureTags(token)
@@ -335,6 +382,11 @@ const submitPost = async () => {
       tagIds: selectedTags.value,
       type: postType.value,
       postVisibleScopeType: postVisibleScope.value,
+      anonymous: anonymous.value,
+      fleaMarket: fleaMarket.value,
+      fleaPrice: fleaMarket.value && fleaPrice.value !== '' ? Number(fleaPrice.value) : undefined,
+      fleaTradeLocation: fleaMarket.value ? fleaTradeLocation.value : undefined,
+      fleaContact: fleaMarket.value ? fleaContact.value : undefined,
     }
 
     if (postType.value === 'LOTTERY') {
@@ -362,7 +414,7 @@ const submitPost = async () => {
       },
       body: JSON.stringify(payload),
     })
-    
+
     const data = await res.json()
     if (res.ok) {
       if (data.reward && data.reward > 0) {
@@ -376,7 +428,7 @@ const submitPost = async () => {
     } else if (res.status === 429) {
       toast.error('发布过于频繁，请稍后再试')
     } else {
-      toast.error(data.error || '发布失败')
+      toast.error(getApiErrorMessage(data, '发布失败，请稍后重试'))
     }
   } catch (e) {
     toast.error('发布失败')
@@ -495,6 +547,50 @@ const submitPost = async () => {
   padding-bottom: 50px;
 }
 
+.campus-options {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding-bottom: 24px;
+}
+
+.campus-option-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-color);
+  cursor: pointer;
+}
+
+.campus-option-item input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-color);
+}
+
+.flea-fields {
+  display: grid;
+  grid-template-columns: minmax(90px, 120px) minmax(160px, 1fr) minmax(160px, 1fr);
+  gap: 10px;
+  width: min(100%, 640px);
+}
+
+.flea-input {
+  min-width: 0;
+  border: 1px solid var(--normal-border-color);
+  border-radius: 8px;
+  padding: 9px 12px;
+  color: var(--text-color);
+  background: var(--background-color);
+  outline: none;
+}
+
+.flea-input:focus {
+  border-color: var(--primary-color);
+}
+
 @media (max-width: 768px) {
   .new-post-page {
     width: calc(100vw - 20px);
@@ -511,6 +607,15 @@ const submitPost = async () => {
 
   .post-options {
     margin-top: 10px;
+  }
+
+  .campus-options {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .flea-fields {
+    grid-template-columns: 1fr;
   }
 }
 </style>

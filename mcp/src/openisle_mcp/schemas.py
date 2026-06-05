@@ -137,6 +137,31 @@ class ReactionInfo(BaseModel):
     model_config = ConfigDict(populate_by_name=True, extra="allow")
 
 
+class FleaMarketItemInfo(BaseModel):
+    """Campus flea market metadata attached to a post."""
+
+    id: Optional[int] = Field(default=None, description="Flea market item identifier.")
+    price: Optional[float] = Field(default=None, description="Listed price for the item.")
+    trade_location: Optional[str] = Field(
+        default=None,
+        alias="tradeLocation",
+        description="Preferred campus transaction location.",
+    )
+    contact: Optional[str] = Field(default=None, description="Seller contact information.")
+    status: Optional[str] = Field(
+        default=None,
+        description="Item status: AVAILABLE, IN_TRANSACTION, or OFF_SHELF.",
+    )
+    buyer: Optional[AuthorInfo] = Field(default=None, description="Interested buyer, when set.")
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        alias="updatedAt",
+        description="When the item metadata was last updated.",
+    )
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")
+
+
 class CommentData(BaseModel):
     """Comment information returned by the backend."""
 
@@ -166,6 +191,12 @@ class CommentData(BaseModel):
         default=None,
         alias="pointReward",
         description="Points rewarded for the comment.",
+    )
+    anonymous: Optional[bool] = Field(default=None, description="Whether the comment is anonymous.")
+    anonymous_alias: Optional[str] = Field(
+        default=None,
+        alias="anonymousAlias",
+        description="Public anonymous alias for the comment.",
     )
 
     model_config = ConfigDict(populate_by_name=True, extra="allow")
@@ -264,6 +295,17 @@ class PostSummary(BaseModel):
         default=None,
         alias="visibleScope",
         description="Visibility scope configuration for the post.",
+    )
+    anonymous: Optional[bool] = Field(default=None, description="Whether the post is anonymous.")
+    anonymous_alias: Optional[str] = Field(
+        default=None,
+        alias="anonymousAlias",
+        description="Public anonymous alias for the post.",
+    )
+    flea_market_item: Optional[FleaMarketItemInfo] = Field(
+        default=None,
+        alias="fleaMarketItem",
+        description="Flea market metadata when this post lists an item.",
     )
 
     model_config = ConfigDict(populate_by_name=True, extra="allow")

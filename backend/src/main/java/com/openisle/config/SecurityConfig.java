@@ -8,13 +8,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import java.time.LocalDate;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -46,8 +44,6 @@ public class SecurityConfig {
 
   @Value("${app.website-url}")
   private String websiteUrl;
-
-  private final RedisTemplate redisTemplate;
 
   @Bean
   public PasswordEncoder passwordEncoder() {
@@ -138,6 +134,8 @@ public class SecurityConfig {
           .requestMatchers("/api/v3/api-docs/**")
           .permitAll()
           .requestMatchers(HttpMethod.POST, "/api/auth/**")
+          .permitAll()
+          .requestMatchers(HttpMethod.GET, "/api/auth/cas/authorize")
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/posts/**")
           .permitAll()
@@ -292,8 +290,7 @@ public class SecurityConfig {
           !(auth instanceof
               org.springframework.security.authentication.AnonymousAuthenticationToken)
         ) {
-          String key = CachingConfig.VISIT_CACHE_NAME + ":" + LocalDate.now();
-          redisTemplate.opsForSet().add(key, auth.getName());
+          userVisitService.recordActiveUser(auth.getName());
         }
         filterChain.doFilter(request, response);
       }

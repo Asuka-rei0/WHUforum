@@ -28,6 +28,7 @@
 <script setup>
 import BaseInput from '~/components/BaseInput.vue'
 import { toast } from '~/main'
+import { getApiErrorMessage } from '~/utils/apiError'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
 
@@ -69,14 +70,14 @@ const submit = async () => {
       toast.success('注册理由已提交,请等待审核')
       await navigateTo('/', { replace: true })
     } else if (data.reason_code === 'INVALID_CREDENTIALS') {
-      toast.error('登录已过期,请重新登录')
+      toast.error('登录已过期，请重新登录')
       await navigateTo('/login', { replace: true })
     } else {
-      toast.error(data.error || '提交失败')
+      toast.error(getApiErrorMessage(data, '提交失败，请稍后重试'))
     }
   } catch (e) {
     isWaitingForRegister.value = false
-    toast.error('提交失败')
+    toast.error('提交失败，请稍后重试')
   }
 }
 </script>

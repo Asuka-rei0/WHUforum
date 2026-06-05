@@ -24,7 +24,13 @@ public class CommentMapper {
     dto.setContent(comment.getContent());
     dto.setCreatedAt(comment.getCreatedAt());
     dto.setPinnedAt(comment.getPinnedAt());
-    dto.setAuthor(userMapper.toAuthorDto(comment.getAuthor()));
+    dto.setAnonymous(comment.isAnonymous());
+    dto.setAnonymousAlias(comment.getAnonymousAlias());
+    dto.setAuthor(
+      comment.isAnonymous()
+        ? userMapper.toAnonymousAuthorDto(comment.getAnonymousAlias())
+        : userMapper.toAuthorDto(comment.getAuthor())
+    );
     dto.setReward(0);
     return dto;
   }

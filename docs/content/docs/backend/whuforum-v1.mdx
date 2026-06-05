@@ -1,0 +1,65 @@
+---
+title: WHUforum V1
+description: Campus forum API contract additions for WHUforum V1.
+---
+
+# WHUforum V1 Contract
+
+WHUforum provides Wuhan University campus forum contracts for email registration, anonymous treehole, flea market, and moderation workflows.
+
+## Auth
+
+- Registration accepts only `@whu.edu.cn` email addresses.
+- Login accepts only a registered Wuhan University email and password.
+- Unverified accounts receive a new email verification code when login is attempted.
+- Verification email delivery failures return `503` with `EMAIL_SEND_FAILED`.
+- Email delivery is configurable through `EMAIL_PROVIDER=resend`, `EMAIL_PROVIDER=smtp`, or `EMAIL_PROVIDER=tencent-ses`.
+- Registration emails include a 24-hour activation token for `/activate?token=...` and still keep the 6-digit code fallback.
+- Admins can call `POST /api/admin/email/test` to send a real test code to a `@whu.edu.cn` mailbox before opening registration.
+- `GET /api/auth/cas/authorize` and `POST /api/auth/cas/callback` are disabled and return `EMAIL_AUTH_ONLY`.
+- Third-party OAuth endpoints return `EMAIL_AUTH_ONLY`.
+
+### Email Delivery
+
+For Resend, configure `RESEND_API_KEY` and `RESEND_FROM_EMAIL`. The sender address must belong to a verified Resend domain; the `resend.dev` sandbox can only send to the email address attached to the Resend account.
+
+For SMTP, set `EMAIL_PROVIDER=smtp` and configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_USERNAME`, `SMTP_PASSWORD`, and optionally `SMTP_FROM_EMAIL`.
+
+For Tencent Cloud SES, set `EMAIL_PROVIDER=tencent-ses` and configure:
+
+- `TENCENTCLOUD_SECRET_ID`
+- `TENCENTCLOUD_SECRET_KEY`
+- `TENCENT_SES_REGION` (`ap-guangzhou` or `ap-hongkong`)
+- `TENCENT_SES_FROM_EMAIL`
+- `TENCENT_SES_TEMPLATE_ID`
+
+Upload `whuforum.html` as an approved Tencent Cloud SES HTML template. The registration template must support `{{username}}` and `{{token}}`; the backend also sends `code`, `email`, and `activateUrl` for optional template variants. Tencent Cloud SES uses `SendEmail` with `TemplateID` and `TemplateData`, and the default `TENCENT_SES_TRIGGER_TYPE=1` marks verification mail as trigger email.
+
+## Posts And Comments
+
+Post create accepts:
+
+- `anonymous`
+- `fleaMarket`
+- `fleaPrice`
+- `fleaTradeLocation`
+- `fleaContact`
+
+Post and comment responses include:
+
+- `anonymous`
+- `anonymousAlias`
+
+Post responses also include `fleaMarketItem` when the post lists a flea market item.
+
+## Flea Market
+
+- `POST /api/posts/{id}/flea-market/interest` moves an available item to `IN_TRANSACTION`.
+- `POST /api/posts/{id}/flea-market/status` accepts `AVAILABLE`, `IN_TRANSACTION`, or `OFF_SHELF`.
+
+## Admin Moderation
+
+- `GET /api/admin/anonymous/posts/{postId}` returns anonymous audit records.
+- `GET /api/admin/sensitive-words` lists sensitive word rules.
+- `POST /api/admin/sensitive-words` creates or updates a rule.
+- `DELETE /api/admin/sensitive-words/{id}` deletes a rule.

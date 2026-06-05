@@ -1,235 +1,301 @@
 <template>
   <div class="login-page">
-    <div class="login-page-content">
-      <div class="login-page-header">
-        <div class="login-page-header-title">Welcome :)</div>
+    <div class="auth-panel">
+      <img class="whu-emblem" src="/whu-emblem.webp" alt="武汉大学校园论坛" />
+      <div class="auth-title">珞珈论坛</div>
+      <div class="auth-subtitle">武汉大学校园论坛</div>
+
+      <form v-if="mode === 'login'" class="auth-form" @submit.prevent="submitLogin">
+        <div class="field-group">
+          <label class="field-label" for="login-email">邮箱</label>
+          <BaseInput
+            id="login-email"
+            icon="mail"
+            v-model="email"
+            type="email"
+            autocomplete="email"
+            placeholder="name@whu.edu.cn"
+          />
+          <div v-if="emailError" class="error-message">{{ emailError }}</div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="login-password">密码</label>
+          <BaseInput
+            id="login-password"
+            icon="lock"
+            v-model="password"
+            type="password"
+            autocomplete="current-password"
+            placeholder="请输入密码"
+          />
+          <div v-if="passwordError" class="error-message">{{ passwordError }}</div>
+        </div>
+
+        <button class="primary-button" type="submit" :disabled="isSubmitting">
+          <loading-four v-if="isSubmitting" class="button-icon" />
+          <span>{{ isSubmitting ? '登录中...' : '邮箱登录' }}</span>
+        </button>
+      </form>
+
+      <div v-else class="auth-form">
+        <div class="mail-notice">
+          <div class="notice-title">激活邮件已重新发送</div>
+          <div class="verify-copy">{{ pendingVerifyEmail }}</div>
+          <div class="notice-copy">请点击邮件中的按钮完成邮箱验证。</div>
+        </div>
+        <button class="secondary-button" type="button" @click="mode = 'login'">返回登录</button>
       </div>
 
-      <div class="email-login-page-content">
-        <BaseInput icon="mail" v-model="username" placeholder="邮箱/用户名" />
-
-        <BaseInput icon="lock" v-model="password" type="password" placeholder="密码" />
-
-        <div v-if="!isWaitingForLogin" class="login-page-button-primary" @click="submitLogin">
-          <div class="login-page-button-text">登录</div>
-        </div>
-
-        <div v-else class="login-page-button-primary disabled">
-          <div class="login-page-button-text">
-            <loading-four class="loading-icon" />
-            登录中...
-          </div>
-        </div>
-
-        <div class="login-page-button-secondary">
-          没有账号？ <a class="login-page-button-secondary-link" href="/signup">注册</a> |
-          <a class="login-page-button-secondary-link" :href="`/forgot-password?email=${username}`"
-            >找回密码</a
-          >
-        </div>
-        <div class="hint-message">
-          <info-icon />
-          使用右侧第三方OAuth注册/登录的用户可使用对应的邮箱进行重设密码
-        </div>
+      <div class="auth-links">
+        <NuxtLink to="/forgot-password">忘记密码</NuxtLink>
+        <span>还没有账号？</span>
+        <NuxtLink to="/signup">注册</NuxtLink>
       </div>
     </div>
-
-    <ThirdPartyAuth mode="login" />
   </div>
 </template>
 
 <script setup>
-import { toast } from '~/main'
-import { setToken } from '~/utils/auth'
 import BaseInput from '~/components/BaseInput.vue'
-import ThirdPartyAuth from '~/components/ThirdPartyAuth.vue'
+import { toast } from '~/main'
+import { getApiErrorMessage } from '~/utils/apiError'
+import { setToken } from '~/utils/auth'
 import { registerPush } from '~/utils/push'
+
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
-const username = ref('')
+
+const mode = ref('login')
+const email = ref('')
 const password = ref('')
-const isWaitingForLogin = ref(false)
+const pendingVerifyEmail = ref('')
+const emailError = ref('')
+const passwordError = ref('')
+const isSubmitting = ref(false)
+
+const normalizeEmail = (value) => (value || '').trim().toLowerCase()
+const isWhuEmail = (value) => normalizeEmail(value).endsWith('@whu.edu.cn')
+
+const clearErrors = () => {
+  emailError.value = ''
+  passwordError.value = ''
+}
+
+const completeLogin = async (token) => {
+  await setToken(token)
+  registerPush()
+  toast.success('登录成功')
+  await navigateTo('/', { replace: true })
+}
 
 const submitLogin = async () => {
+  clearErrors()
+  const loginEmail = normalizeEmail(email.value)
+  if (!isWhuEmail(loginEmail)) {
+    emailError.value = '请使用 @whu.edu.cn 邮箱登录'
+    return
+  }
+  if (!password.value) {
+    passwordError.value = '请输入密码'
+    return
+  }
+
   try {
-    isWaitingForLogin.value = true
+    isSubmitting.value = true
     const res = await fetch(`${API_BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username: username.value, password: password.value }),
+      body: JSON.stringify({
+        email: loginEmail,
+        password: password.value,
+      }),
     })
     const data = await res.json().catch(() => ({}))
     if (res.ok && data.token) {
-      setToken(data.token)
-      toast.success('登录成功')
-      registerPush()
-      await navigateTo('/', { replace: true })
-    } else if (data.reason_code === 'EMAIL_SEND_FAILED') {
-      const msg = data.error || data.message || res.statusText || '登录失败'
-      toast.error(`${res.status} ${msg} (${data.reason_code})`)
-    } else if (data.reason_code === 'NOT_VERIFIED') {
-      toast.info('当前邮箱未验证，已经为您重新发送验证码')
-      await navigateTo(
-        { path: '/signup', query: { verify: '1', u: username.value } },
-        { replace: true },
-      )
-    } else if (data.reason_code === 'IS_APPROVING') {
-      toast.info('您的注册正在审批中, 请留意邮件')
-      await navigateTo('/', { replace: true })
-    } else if (data.reason_code === 'NOT_APPROVED') {
-      await navigateTo({ path: '/signup-reason', query: { token: data.token } }, { replace: true })
-    } else {
-      const msg = data.error || data.message || res.statusText || '登录失败'
-      const reason = data.reason_code ? ` (${data.reason_code})` : ''
-      toast.error(`${res.status} ${msg}${reason}`)
+      await completeLogin(data.token)
+      return
     }
+    if (data.reason_code === 'NOT_VERIFIED') {
+      pendingVerifyEmail.value = loginEmail
+      mode.value = 'activationSent'
+      toast.error('账号尚未完成邮箱验证，激活邮件已重新发送')
+      return
+    }
+    if (data.reason_code === 'NOT_APPROVED' && data.token) {
+      await navigateTo(`/signup-reason?token=${data.token}`, { replace: true })
+      return
+    }
+    if (data.reason_code === 'IS_APPROVING') {
+      toast.error('账号正在审核中')
+      return
+    }
+    if (data.field === 'email' || data.reason_code === 'WHU_EMAIL_REQUIRED') {
+      emailError.value = getApiErrorMessage(data, '请使用 @whu.edu.cn 邮箱登录')
+      return
+    }
+    toast.error(getApiErrorMessage(data, '邮箱或密码不正确'))
   } catch (e) {
-    toast.error(`登录失败: ${e.message}`)
+    toast.error('登录失败，请稍后重试')
   } finally {
-    isWaitingForLogin.value = false
+    isSubmitting.value = false
   }
 }
 </script>
 
 <style scoped>
 .login-page {
+  min-height: 100%;
+  width: 100%;
   display: flex;
-  flex-direction: row;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  width: 100%;
-  background-color: var(--background-color);
+  background:
+    linear-gradient(180deg, rgba(0, 92, 70, 0.08), transparent 42%), var(--background-color);
+  padding: 32px 20px;
 }
 
-.login-page-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  width: calc(40% - 120px);
-  border-right: 1px solid var(--normal-border-color);
-  padding-right: 120px;
-}
-
-.login-page-header-title {
-  font-family: 'Pacifico', 'Comic Sans MS', cursive, 'Roboto', sans-serif;
-  font-size: 42px;
-  font-weight: bold;
-  width: 100%;
-  opacity: 0.75;
-}
-
-.login-page-header {
-  font-size: 42px;
-  font-weight: bold;
-  width: 100%;
-}
-
-.email-login-page-content {
-  margin-top: 40px;
+.auth-panel {
+  width: min(100%, 390px);
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  gap: 16px;
+}
+
+.whu-emblem {
+  width: 104px;
+  height: 104px;
+  object-fit: contain;
+}
+
+.auth-title {
+  font-size: 34px;
+  font-weight: 800;
+  color: #005c46;
+}
+
+.auth-subtitle,
+.verify-copy {
+  font-size: 15px;
+  color: var(--text-color);
+  opacity: 0.72;
+  text-align: center;
+}
+
+.mail-notice {
   width: 100%;
-  gap: 20px;
-}
-
-.login-page-input {
+  border: 1px solid var(--normal-border-color);
+  border-radius: 8px;
+  padding: 18px;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  width: calc(100% - 40px);
-  padding: 15px 20px;
-  border-radius: 10px;
-  border: 1px solid #ccc;
-  gap: 10px;
-  margin-bottom: 20px;
+  flex-direction: column;
+  gap: 8px;
+  box-sizing: border-box;
+  text-align: center;
 }
 
-.login-page-input-icon {
-  opacity: 0.5;
-  font-size: 16px;
+.notice-title {
+  font-size: 18px;
+  font-weight: 800;
+  color: #005c46;
 }
 
-.login-page-input-text {
-  border: none;
-  outline: none;
+.notice-copy {
+  font-size: 14px;
+  color: var(--text-color);
+}
+
+.auth-form {
   width: 100%;
-  font-size: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 10px;
 }
 
-.login-page-button-primary {
-  margin-top: 20px;
+.field-group {
+  width: 100%;
   display: flex;
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  width: calc(100% - 40px);
-  background-color: var(--primary-color);
-  color: white;
-  padding: 10px 20px;
-  border-radius: 10px;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.field-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-color);
+}
+
+.primary-button,
+.secondary-button {
+  width: 100%;
+  min-height: 44px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
   cursor: pointer;
-  gap: 10px;
 }
 
-.login-page-button-primary:hover {
-  background-color: var(--primary-color-hover);
+.primary-button {
+  border: none;
+  background: #005c46;
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
 }
 
-.login-page-button-primary.disabled {
-  background-color: var(--primary-color-disabled);
-  opacity: 0.5;
+.primary-button:hover {
+  background: #003f72;
+}
+
+.primary-button:disabled {
+  opacity: 0.65;
   cursor: not-allowed;
 }
 
-.login-page-button-primary.disabled:hover {
-  background-color: var(--primary-color-disabled);
+.secondary-button {
+  border: 1px solid var(--normal-border-color);
+  background: transparent;
+  color: var(--text-color);
 }
 
-.login-page-button-text {
-  font-size: 16px;
+.button-icon {
+  font-size: 18px;
 }
 
-.login-page-button-secondary {
-  margin-top: 20px;
-  font-size: 16px;
-  opacity: 0.7;
+.error-message {
+  color: #d93025;
+  font-size: 13px;
 }
 
-.login-page-button-secondary-link {
+.auth-links {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  color: var(--text-color);
+  opacity: 0.78;
+}
+
+.auth-links a {
   color: var(--primary-color);
+  font-weight: 700;
+  text-decoration: none;
 }
 
-.hint-message {
-  font-size: 12px;
-  opacity: 0.7;
+.auth-links a:hover {
+  text-decoration: underline;
 }
 
 @media (max-width: 768px) {
   .login-page {
-    flex-direction: column;
-    justify-content: flex-start;
-  }
-
-  .login-page-content {
-    margin-top: 20px;
-    width: calc(100% - 40px);
-    border-right: none;
-    padding-left: 20px;
-    padding-right: 20px;
-  }
-
-  .login-page-button-primary {
-    margin-top: 0px;
-  }
-
-  .login-page-button-secondary {
-    margin-top: 0px;
-    font-size: 13px;
+    align-items: flex-start;
+    padding-top: 72px;
   }
 }
 </style>

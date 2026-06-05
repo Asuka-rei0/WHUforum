@@ -76,7 +76,12 @@ public class PostController {
       req.getOptions(),
       req.getMultiple(),
       req.getProposedName(),
-      req.getProposalDescription()
+      req.getProposalDescription(),
+      req.getAnonymous(),
+      req.getFleaMarket(),
+      req.getFleaPrice(),
+      req.getFleaTradeLocation(),
+      req.getFleaContact()
     );
     draftService.deleteDraft(auth.getName());
     PostDetailDto dto = postMapper.toDetailDto(post, auth.getName());
@@ -140,6 +145,42 @@ public class PostController {
   )
   public PostSummaryDto reopen(@PathVariable Long id, Authentication auth) {
     return postMapper.toSummaryDto(postService.reopenPost(id, auth.getName()));
+  }
+
+  @PostMapping("/{id}/flea-market/interest")
+  @SecurityRequirement(name = "JWT")
+  @Operation(
+    summary = "Express flea market interest",
+    description = "Mark a flea item as in transaction"
+  )
+  @ApiResponse(
+    responseCode = "200",
+    description = "Updated post",
+    content = @Content(schema = @Schema(implementation = PostSummaryDto.class))
+  )
+  public PostSummaryDto expressFleaMarketInterest(@PathVariable Long id, Authentication auth) {
+    postService.expressFleaMarketInterest(id, auth.getName());
+    return postMapper.toSummaryDto(postService.getPost(id));
+  }
+
+  @PostMapping("/{id}/flea-market/status")
+  @SecurityRequirement(name = "JWT")
+  @Operation(
+    summary = "Update flea market status",
+    description = "Update a flea market item status"
+  )
+  @ApiResponse(
+    responseCode = "200",
+    description = "Updated post",
+    content = @Content(schema = @Schema(implementation = PostSummaryDto.class))
+  )
+  public PostSummaryDto updateFleaMarketStatus(
+    @PathVariable Long id,
+    @RequestBody com.openisle.dto.FleaMarketStatusUpdateRequest req,
+    Authentication auth
+  ) {
+    postService.updateFleaMarketStatus(id, auth.getName(), req.getStatus());
+    return postMapper.toSummaryDto(postService.getPost(id));
   }
 
   @GetMapping("/{id}")

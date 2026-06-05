@@ -50,4 +50,10 @@ public class Comment {
 
   @Column(name = "deleted_at")
   private LocalDateTime deletedAt;
+
+  @Column(nullable = false)
+  private boolean anonymous = false;
+
+  @Column(length = 80)
+  private String anonymousAlias;
 }

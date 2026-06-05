@@ -5,9 +5,9 @@ import type { BaseLayoutProps } from "fumadocs-ui/layouts/shared";
  */
 export function baseOptions(): BaseLayoutProps {
   return {
-    githubUrl: "https://github.com/nagisa77/OpenIsle",
+    githubUrl: "https://github.com/nagisa77/WHUforum",
     nav: {
-      title: "OpenIsle Docs",
+      title: "珞珈论坛文档",
       url: "/",
     },
     searchToggle: {

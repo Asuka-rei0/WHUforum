@@ -14,13 +14,8 @@
           ></span>
         </div>
         <NuxtLink class="logo-container" :to="`/`" @click="refrechData">
-          <BaseImage
-            alt="OpenIsle"
-            src="https://openisle-1307107697.cos.ap-guangzhou.myqcloud.com/assert/image.png"
-            width="60"
-            height="60"
-          />
-          <div class="logo-text">OpenIsle</div>
+          <img class="brand-logo" src="/whu-emblem.webp" alt="武汉大学校园论坛" />
+          <div class="logo-text">珞珈论坛</div>
         </NuxtLink>
       </div>
 
@@ -128,6 +123,7 @@ import { useChannelsUnreadCount } from '~/composables/useChannelsUnreadCount'
 import { useIsMobile } from '~/utils/screen'
 import { themeState, cycleTheme, ThemeMode } from '~/utils/theme'
 import { toast } from '~/main'
+import { getApiErrorMessage } from '~/utils/apiError'
 import { getToken } from '~/utils/auth'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
@@ -239,7 +235,7 @@ const copyInviteLink = async () => {
       }, 0)
     } else {
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error || '生成邀请链接失败')
+      toast.error(getApiErrorMessage(data, '生成邀请链接失败，请稍后重试'))
     }
   } catch (e) {
     toast.error('生成邀请链接失败')
@@ -338,6 +334,13 @@ onMounted(async () => {
   cursor: pointer;
   text-decoration: none;
   color: inherit;
+}
+
+.brand-logo {
+  width: 44px;
+  height: 44px;
+  object-fit: contain;
+  margin-right: 10px;
 }
 
 .header-content {

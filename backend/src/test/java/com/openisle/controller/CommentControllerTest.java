@@ -9,12 +9,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.openisle.dto.CommentDto;
 import com.openisle.mapper.CommentMapper;
+import com.openisle.mapper.PostChangeLogMapper;
+import com.openisle.mapper.PostMapper;
 import com.openisle.model.Comment;
 import com.openisle.model.Post;
 import com.openisle.model.User;
 import com.openisle.service.CaptchaService;
 import com.openisle.service.CommentService;
 import com.openisle.service.LevelService;
+import com.openisle.service.PointService;
+import com.openisle.service.PostChangeLogService;
 import com.openisle.service.ReactionService;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -49,6 +53,18 @@ class CommentControllerTest {
   @MockBean
   private CommentMapper commentMapper;
 
+  @MockBean
+  private PointService pointService;
+
+  @MockBean
+  private PostChangeLogService changeLogService;
+
+  @MockBean
+  private PostChangeLogMapper postChangeLogMapper;
+
+  @MockBean
+  private PostMapper postMapper;
+
   private Comment createComment(Long id, String content, String authorName) {
     User user = new User();
     user.setUsername(authorName);
@@ -64,8 +80,11 @@ class CommentControllerTest {
   @Test
   void createAndListComments() throws Exception {
     Comment comment = createComment(1L, "hi", "bob");
-    Mockito.when(commentService.addComment(eq("bob"), eq(1L), eq("hi"))).thenReturn(comment);
+    Mockito.when(commentService.addComment(eq("bob"), eq(1L), eq("hi"), eq(false))).thenReturn(
+      comment
+    );
     Mockito.when(commentService.getCommentsForPost(eq(1L), any())).thenReturn(List.of(comment));
+    Mockito.when(changeLogService.listLogs(1L)).thenReturn(List.of());
     Mockito.when(commentService.getReplies(1L)).thenReturn(List.of());
     Mockito.when(reactionService.getReactionsForComment(1L)).thenReturn(List.of());
     CommentDto dto = new CommentDto();
@@ -93,7 +112,9 @@ class CommentControllerTest {
   @Test
   void replyComment() throws Exception {
     Comment reply = createComment(2L, "re", "alice");
-    Mockito.when(commentService.addReply(eq("alice"), eq(1L), eq("re"))).thenReturn(reply);
+    Mockito.when(commentService.addReply(eq("alice"), eq(1L), eq("re"), eq(false))).thenReturn(
+      reply
+    );
     CommentDto dto = new CommentDto();
     dto.setId(reply.getId());
     dto.setContent(reply.getContent());

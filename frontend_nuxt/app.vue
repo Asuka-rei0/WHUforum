@@ -51,18 +51,9 @@ await checkToken()
 const showNewPostIcon = computed(() => useRoute().path === '/')
 
 const hideMenu = computed(() => {
-  return [
-    '/login',
-    '/signup',
-    '/404',
-    '/signup-reason',
-    '/github-callback',
-    '/twitter-callback',
-    '/discord-callback',
-    '/forgot-password',
-    '/google-callback',
-    '/telegram-callback',
-  ].includes(useRoute().path)
+  return ['/login', '/signup', '/404', '/signup-reason', '/forgot-password'].includes(
+    useRoute().path,
+  )
 })
 
 const header = useTemplateRef('header')

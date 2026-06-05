@@ -110,6 +110,48 @@
             @click="handleContentClick"
           ></div>
 
+          <div v-if="fleaMarketItem" class="flea-market-panel">
+            <div class="flea-market-main">
+              <div class="flea-market-title">
+                跳蚤市场
+                <span class="flea-market-status">{{ fleaStatusText(fleaMarketItem.status) }}</span>
+              </div>
+              <div class="flea-market-meta">
+                <span v-if="fleaMarketItem.price !== null && fleaMarketItem.price !== undefined">
+                  ￥{{ fleaMarketItem.price }}
+                </span>
+                <span v-if="fleaMarketItem.tradeLocation">{{ fleaMarketItem.tradeLocation }}</span>
+                <span v-if="fleaMarketItem.contact">{{ fleaMarketItem.contact }}</span>
+              </div>
+            </div>
+            <div class="flea-market-actions">
+              <button
+                v-if="loggedIn && !isAuthor && fleaMarketItem.status === 'AVAILABLE'"
+                type="button"
+                class="flea-action"
+                @click="expressFleaInterest"
+              >
+                发起交易意向
+              </button>
+              <button
+                v-if="(isAuthor || isAdmin) && fleaMarketItem.status !== 'AVAILABLE'"
+                type="button"
+                class="flea-action secondary"
+                @click="updateFleaStatus('AVAILABLE')"
+              >
+                重新上架
+              </button>
+              <button
+                v-if="(isAuthor || isAdmin) && fleaMarketItem.status !== 'OFF_SHELF'"
+                type="button"
+                class="flea-action secondary"
+                @click="updateFleaStatus('OFF_SHELF')"
+              >
+                下架
+              </button>
+            </div>
+          </div>
+
           <div class="article-footer-container">
             <div class="article-option-container">
               <ReactionsGroup
@@ -118,7 +160,12 @@
                 content-type="post"
                 :content-id="postId"
               />
-              <DonateGroup :post-id="postId" :author-id="author.id" :is-author="isAuthor" />
+              <DonateGroup
+                v-if="author.id"
+                :post-id="postId"
+                :author-id="author.id"
+                :is-author="isAuthor"
+              />
             </div>
             <div class="article-footer-actions">
               <div
@@ -295,7 +342,7 @@ const headerHeight = import.meta.client
   : 0
 
 useHead(() => ({
-  title: title.value ? `OpenIsle - ${title.value}` : 'OpenIsle',
+  title: title.value ? `珞珈论坛 - ${title.value}` : '珞珈论坛',
   meta: [
     {
       name: 'description',
@@ -318,6 +365,19 @@ const isAdmin = computed(() => authState.role === 'ADMIN')
 const isAuthor = computed(() => authState.username === author.value.username)
 const lottery = ref(null)
 const poll = ref(null)
+const fleaMarketItem = ref(null)
+const fleaStatusText = (status) => {
+  switch (status) {
+    case 'AVAILABLE':
+      return '可交易'
+    case 'IN_TRANSACTION':
+      return '交易中'
+    case 'OFF_SHELF':
+      return '已下架'
+    default:
+      return '跳蚤'
+  }
+}
 const articleMenuItems = computed(() => {
   const items = []
   if (isAuthor.value || isAdmin.value) {
@@ -571,6 +631,7 @@ watchEffect(() => {
   postTime.value = TimeManager.format(data.createdAt)
   lottery.value = data.lottery || null
   poll.value = data.poll || null
+  fleaMarketItem.value = data.fleaMarketItem || null
 })
 
 // 404 客户端跳转
@@ -659,11 +720,11 @@ const postComment = async (parentUserName, text, clear) => {
     } else if (res.status === 429) {
       toast.error('评论过于频繁，请稍后再试')
     } else {
-      toast.error(`评论失败: ${res.status} ${res.statusText}`)
+      toast.error('评论失败，请稍后再试')
     }
   } catch (e) {
     console.debug('Post comment error', e)
-    toast.error(`评论失败: ${e.message}`)
+    toast.error('评论失败，请稍后再试')
   } finally {
     isWaitingPostingComment.value = false
   }
@@ -872,6 +933,42 @@ const unsubscribePost = async () => {
   }
 }
 
+const expressFleaInterest = async () => {
+  const token = getToken()
+  if (!token) {
+    toast.error('请先登录')
+    return
+  }
+  const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/flea-market/interest`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (res.ok) {
+    const data = await res.json()
+    fleaMarketItem.value = data.fleaMarketItem || fleaMarketItem.value
+    toast.success('已发起交易意向')
+  } else {
+    toast.error('操作失败')
+  }
+}
+
+const updateFleaStatus = async (status) => {
+  const token = getToken()
+  if (!token) return
+  const res = await fetch(`${API_BASE_URL}/api/posts/${postId}/flea-market/status`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ status }),
+  })
+  if (res.ok) {
+    const data = await res.json()
+    fleaMarketItem.value = data.fleaMarketItem || fleaMarketItem.value
+    toast.success('状态已更新')
+  } else {
+    toast.error('操作失败')
+  }
+}
+
 const fetchCommentSorts = () => {
   return Promise.resolve([
     { id: 'NEWEST', name: '最新', icon: 'lightning' },
@@ -1002,6 +1099,7 @@ const jumpToHashComment = async () => {
 }
 
 const gotoProfile = () => {
+  if (!author.value?.id) return
   navigateTo(`/users/${author.value.id}`, { replace: true })
 }
 
@@ -1397,6 +1495,65 @@ onMounted(async () => {
 .info-content-text {
   font-size: 16px;
   line-height: 1.5;
+}
+
+.flea-market-panel {
+  margin: 16px 0;
+  padding: 14px;
+  border: 1px solid rgba(0, 92, 70, 0.22);
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: rgba(0, 92, 70, 0.05);
+}
+
+.flea-market-main {
+  min-width: 220px;
+}
+
+.flea-market-title {
+  font-weight: 800;
+  color: #005c46;
+}
+
+.flea-market-status {
+  margin-left: 8px;
+  font-size: 12px;
+  padding: 2px 7px;
+  border-radius: 8px;
+  background: rgba(0, 63, 114, 0.1);
+  color: #003f72;
+}
+
+.flea-market-meta {
+  margin-top: 8px;
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 14px;
+  opacity: 0.8;
+}
+
+.flea-market-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.flea-action {
+  border: none;
+  border-radius: 8px;
+  padding: 8px 12px;
+  background: #005c46;
+  color: #fff;
+  cursor: pointer;
+}
+
+.flea-action.secondary {
+  background: #003f72;
 }
 
 .article-footer-container {

@@ -19,4 +19,6 @@ public class CommentDto {
   private List<ReactionDto> reactions;
   private int reward;
   private int pointReward;
+  private boolean anonymous;
+  private String anonymousAlias;
 }

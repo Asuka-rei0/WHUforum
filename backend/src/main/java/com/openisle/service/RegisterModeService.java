@@ -12,7 +12,7 @@ public class RegisterModeService {
 
   private RegisterMode registerMode;
 
-  public RegisterModeService(@Value("${app.register.mode:WHITELIST}") RegisterMode registerMode) {
+  public RegisterModeService(@Value("${app.register.mode:DIRECT}") RegisterMode registerMode) {
     this.registerMode = registerMode;
   }
 

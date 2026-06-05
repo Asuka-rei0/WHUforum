@@ -69,6 +69,10 @@
               <ranking-list v-else-if="article.type === 'POLL'" class="poll-icon" />
               <hands v-else-if="article.type === 'PROPOSAL'" class="proposal-icon" />
               <star v-if="!article.rssExcluded" class="featured-icon" />
+              <span v-if="article.anonymous" class="article-badge anonymous">匿名</span>
+              <span v-if="article.fleaMarketItem" class="article-badge flea">
+                {{ fleaStatusText(article.fleaMarketItem.status) }}
+              </span>
               {{ article.title }}
               <lock class="preview-close-icon" v-if="article.isRestricted" />
             </NuxtLink>
@@ -142,12 +146,12 @@ import TimeManager from '~/utils/time'
 import { selectedCategoryGlobal, selectedTagsGlobal } from '~/composables/postFilter'
 import { stripMarkdownWithTiebaMoji } from '~/utils/markdown'
 useHead({
-  title: 'OpenIsle - 全面开源的自由社区',
+  title: '珞珈论坛 - 武汉大学校园论坛',
   meta: [
     {
       name: 'description',
       content:
-        'OpenIsle 是一个开放的技术与交流社区，致力于为开发者、技术爱好者和创作者们提供一个自由、友好、包容的讨论与协作环境。我们鼓励用户在这里分享知识、交流经验、提出问题、展示作品，并共同推动技术进步与社区成长。',
+        '珞珈论坛是面向武汉大学师生和校友的校园交流社区，支持课程讨论、校园生活、跳蚤市场、树洞互助与活动信息分享。',
     },
   ],
 })
@@ -159,6 +163,7 @@ const selectedTags = ref([])
 const route = useRoute()
 const tagOptions = ref([])
 const categoryOptions = ref([])
+const isPlaceholderTaxonomy = (item) => /^测试用/.test(item?.name || '')
 const clearFilters = () => {
   selectedCategory.value = ''
   selectedTags.value = []
@@ -192,6 +197,18 @@ const isMobile = useIsMobile()
 const selectedCategorySet = (category) => {
   const c = decodeURIComponent(category)
   selectedCategory.value = isNaN(c) ? c : Number(c)
+}
+const fleaStatusText = (status) => {
+  switch (status) {
+    case 'AVAILABLE':
+      return '可交易'
+    case 'IN_TRANSACTION':
+      return '交易中'
+    case 'OFF_SHELF':
+      return '已下架'
+    default:
+      return '跳蚤'
+  }
 }
 const selectedTagsSet = (tags) => {
   const t = Array.isArray(tags) ? tags.join(',') : tags
@@ -292,7 +309,10 @@ const loadOptions = async () => {
   if (selectedCategory.value && !isNaN(selectedCategory.value)) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/categories/`)
-      if (res.ok) categoryOptions.value = [await res.json()]
+      if (res.ok) {
+        const category = await res.json()
+        categoryOptions.value = isPlaceholderTaxonomy(category) ? [] : [category]
+      }
     } catch {}
   }
   if (selectedTags.value.length) {
@@ -301,7 +321,10 @@ const loadOptions = async () => {
       if (!isNaN(t)) {
         try {
           const r = await fetch(`${API_BASE_URL}/api/tags/${t}`)
-          if (r.ok) arr.push(await r.json())
+          if (r.ok) {
+            const tag = await r.json()
+            if (!isPlaceholderTaxonomy(tag)) arr.push(tag)
+          }
         } catch {}
       }
     }
@@ -366,6 +389,8 @@ const {
       ),
       pinned: Boolean(p.pinned ?? p.pinnedAt ?? p.pinned_at),
       type: p.type,
+      anonymous: p.anonymous,
+      fleaMarketItem: p.fleaMarketItem || null,
     }))
   },
   {
@@ -409,6 +434,8 @@ const fetchNextPage = async () => {
     ),
     pinned: Boolean(p.pinned ?? p.pinnedAt ?? p.pinned_at),
     type: p.type,
+    anonymous: p.anonymous,
+    fleaMarketItem: p.fleaMarketItem || null,
   }))
   articles.value.push(...mapped)
 
@@ -649,6 +676,28 @@ watch([selectedCategory, selectedTags], ([newCategory, newTags]) => {
 
 .featured-icon {
   color: var(--featured-color);
+}
+
+.article-badge {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 7px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 20px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.article-badge.anonymous {
+  color: #003f72;
+  background: rgba(0, 63, 114, 0.1);
+}
+
+.article-badge.flea {
+  color: #005c46;
+  background: rgba(0, 92, 70, 0.1);
 }
 
 .article-item-description {

@@ -1,11 +1,11 @@
 ---
 title: 部署指南
-description: OpenIsle 预发与生产环境部署说明
+description: 珞珈论坛预发与生产环境部署说明
 ---
 
 # 部署指南
 
-本页覆盖 OpenIsle 当前仓库内已有的部署链路：`deploy/` 脚本 + GitHub Actions 工作流 + Docker Compose。
+本页覆盖珞珈论坛当前仓库内已有的部署链路：`deploy/` 脚本 + GitHub Actions 工作流 + Docker Compose。
 
 ## 部署总览
 
@@ -16,17 +16,17 @@ description: OpenIsle 预发与生产环境部署说明
 
 说明：
 
-- 两套工作流共用并发锁 `openisle-server`，避免同一台服务器并发部署冲突。
+- 两套工作流共用并发锁 `whuforum-server`，避免同一台服务器并发部署冲突。
 - 两个脚本都会执行 `git checkout -B <branch> origin/<branch>` + `git reset --hard origin/<branch>`，确保服务器代码与远端分支对齐。
 
 ## 前置条件
 
 1. 服务器已安装：`git`、`docker`、`docker compose`（插件版本）。
 2. 服务器目录与脚本保持一致：
-   - 生产仓库路径：`/opt/openisle/OpenIsle`
-   - 预发仓库路径：`/opt/openisle/OpenIsle-staging`
+   - 生产仓库路径：`/opt/whuforum/WHUforum`
+   - 预发仓库路径：`/opt/whuforum/WHUforum-staging`
 3. 两个仓库目录下都已创建 `.env`（基于根目录 `.env.example`）。
-4. 已配置反向代理（参考 `nginx/openisle` 与 `nginx/openisle-staging`）。
+4. 已配置反向代理（参考 `nginx/whuforum` 与 `nginx/whuforum-staging`）。
 
 ## 环境变量准备
 
@@ -49,10 +49,10 @@ SERVER_PORT=8081
 FRONTEND_PORT=3001
 WEBSOCKET_PORT=8083
 OPENISLE_MCP_PORT=8086
-WEBSITE_URL=https://staging.open-isle.com
-NUXT_PUBLIC_API_BASE_URL=https://staging.open-isle.com
-NUXT_PUBLIC_WEBSOCKET_URL=https://staging.open-isle.com/websocket
-NUXT_PUBLIC_WEBSITE_BASE_URL=https://staging.open-isle.com
+WEBSITE_URL=https://staging.forum.whu.edu.cn
+NUXT_PUBLIC_API_BASE_URL=https://staging.forum.whu.edu.cn
+NUXT_PUBLIC_WEBSOCKET_URL=https://staging.forum.whu.edu.cn/websocket
+NUXT_PUBLIC_WEBSITE_BASE_URL=https://staging.forum.whu.edu.cn
 ```
 
 ## 手动部署
@@ -61,17 +61,17 @@ NUXT_PUBLIC_WEBSITE_BASE_URL=https://staging.open-isle.com
 
 ```bash
 # 生产（默认 main）
-bash /opt/openisle/OpenIsle/deploy/deploy.sh
+bash /opt/whuforum/WHUforum/deploy/deploy.sh
 
 # 预发（默认 main）
-bash /opt/openisle/OpenIsle/deploy/deploy_staging.sh
+bash /opt/whuforum/WHUforum/deploy/deploy_staging.sh
 ```
 
 部署指定分支：
 
 ```bash
-bash /opt/openisle/OpenIsle/deploy/deploy.sh feature/xxx
-bash /opt/openisle/OpenIsle/deploy/deploy_staging.sh feature/xxx
+bash /opt/whuforum/WHUforum/deploy/deploy.sh feature/xxx
+bash /opt/whuforum/WHUforum/deploy/deploy_staging.sh feature/xxx
 ```
 
 脚本会自动完成：
@@ -97,20 +97,20 @@ bash /opt/openisle/OpenIsle/deploy/deploy_staging.sh feature/xxx
 查看容器状态：
 
 ```bash
-docker compose -f /opt/openisle/OpenIsle/docker/docker-compose.yaml --env-file /opt/openisle/OpenIsle/.env ps
-docker compose -f /opt/openisle/OpenIsle-staging/docker/docker-compose.yaml --env-file /opt/openisle/OpenIsle-staging/.env ps
+docker compose -f /opt/whuforum/WHUforum/docker/docker-compose.yaml --env-file /opt/whuforum/WHUforum/.env ps
+docker compose -f /opt/whuforum/WHUforum-staging/docker/docker-compose.yaml --env-file /opt/whuforum/WHUforum-staging/.env ps
 ```
 
 查看核心服务日志：
 
 ```bash
-docker compose -f /opt/openisle/OpenIsle/docker/docker-compose.yaml --env-file /opt/openisle/OpenIsle/.env logs -f springboot websocket-service frontend_service
+docker compose -f /opt/whuforum/WHUforum/docker/docker-compose.yaml --env-file /opt/whuforum/WHUforum/.env logs -f springboot websocket-service frontend_service
 ```
 
 本机健康检查（自动读取 `.env` 端口）：
 
 ```bash
-ENV_FILE=/opt/openisle/OpenIsle/.env
+ENV_FILE=/opt/whuforum/WHUforum/.env
 SERVER_PORT=$(grep '^SERVER_PORT=' "$ENV_FILE" | cut -d= -f2)
 WS_PORT=$(grep '^WEBSOCKET_PORT=' "$ENV_FILE" | cut -d= -f2)
 curl -fsS "http://127.0.0.1:${SERVER_PORT}/actuator/health"
@@ -131,13 +131,13 @@ curl -fsS "http://127.0.0.1:${WS_PORT}/actuator/health"
 2. 在服务器按分支重新部署：
 
    ```bash
-   bash /opt/openisle/OpenIsle/deploy/deploy.sh rollback/2026-02-11
+   bash /opt/whuforum/WHUforum/deploy/deploy.sh rollback/2026-02-11
    ```
 
 同理可用于预发：
 
 ```bash
-bash /opt/openisle/OpenIsle/deploy/deploy_staging.sh rollback/2026-02-11
+bash /opt/whuforum/WHUforum/deploy/deploy_staging.sh rollback/2026-02-11
 ```
 
 ## 风险提示

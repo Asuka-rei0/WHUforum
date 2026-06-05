@@ -1,6 +1,7 @@
 package com.openisle.controller;
 
 import com.openisle.dto.*;
+import com.openisle.exception.FieldException;
 import com.openisle.exception.NotFoundException;
 import com.openisle.mapper.TagMapper;
 import com.openisle.mapper.UserMapper;
@@ -119,6 +120,31 @@ public class UserController {
         userMapper.toDto(user, auth)
       )
     );
+  }
+
+  @DeleteMapping("/me")
+  @SecurityRequirement(name = "JWT")
+  @Operation(
+    summary = "Delete current account",
+    description = "Delete the current account after password confirmation"
+  )
+  @ApiResponse(
+    responseCode = "200",
+    description = "Account deleted",
+    content = @Content(schema = @Schema(implementation = Map.class))
+  )
+  public ResponseEntity<?> deleteMe(
+    @RequestBody(required = false) DeleteAccountRequest request,
+    Authentication auth
+  ) {
+    try {
+      userService.deleteAccount(auth.getName(), request == null ? null : request.getPassword());
+      return ResponseEntity.ok(Map.of("message", "Account deleted"));
+    } catch (FieldException e) {
+      return ResponseEntity.badRequest().body(
+        Map.of("field", e.getField(), "error", e.getMessage(), "reason_code", "INVALID_PASSWORD")
+      );
+    }
   }
 
   // 这个方法似乎没有使用？

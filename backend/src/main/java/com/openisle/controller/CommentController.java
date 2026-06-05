@@ -68,7 +68,12 @@ public class CommentController {
       log.debug("Captcha verification failed for user {} on post {}", auth.getName(), postId);
       return ResponseEntity.badRequest().build();
     }
-    Comment comment = commentService.addComment(auth.getName(), postId, req.getContent());
+    Comment comment = commentService.addComment(
+      auth.getName(),
+      postId,
+      req.getContent(),
+      Boolean.TRUE.equals(req.getAnonymous())
+    );
     CommentDto dto = commentMapper.toDto(comment);
     dto.setReward(levelService.awardForComment(auth.getName()));
     dto.setPointReward(pointService.awardForComment(auth.getName(), postId, comment.getId()));
@@ -94,7 +99,12 @@ public class CommentController {
       log.debug("Captcha verification failed for user {} on comment {}", auth.getName(), commentId);
       return ResponseEntity.badRequest().build();
     }
-    Comment comment = commentService.addReply(auth.getName(), commentId, req.getContent());
+    Comment comment = commentService.addReply(
+      auth.getName(),
+      commentId,
+      req.getContent(),
+      Boolean.TRUE.equals(req.getAnonymous())
+    );
     CommentDto dto = commentMapper.toDto(comment);
     dto.setReward(levelService.awardForComment(auth.getName()));
     log.debug("replyComment succeeded for comment {}", comment.getId());
@@ -190,8 +200,9 @@ public class CommentController {
     int safePageSize = Math.max(1, pageSize);
     int fromIndex = safePage * safePageSize;
     int toIndex = Math.min(fromIndex + safePageSize, itemDtoList.size());
-    List<TimelineItemDto<?>> pagedItems =
-      fromIndex >= itemDtoList.size() ? List.of() : itemDtoList.subList(fromIndex, toIndex);
+    List<TimelineItemDto<?>> pagedItems = fromIndex >= itemDtoList.size()
+      ? List.of()
+      : itemDtoList.subList(fromIndex, toIndex);
 
     log.debug(
       "listComments returning {} items for post {} page {} size {} (total {})",

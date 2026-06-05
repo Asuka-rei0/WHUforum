@@ -10,11 +10,13 @@ import com.openisle.dto.ProposalDto;
 import com.openisle.dto.ReactionDto;
 import com.openisle.model.CategoryProposalPost;
 import com.openisle.model.CommentSort;
+import com.openisle.model.FleaMarketItem;
 import com.openisle.model.LotteryPost;
 import com.openisle.model.PollPost;
 import com.openisle.model.PollVote;
 import com.openisle.model.Post;
 import com.openisle.model.User;
+import com.openisle.repository.FleaMarketItemRepository;
 import com.openisle.repository.PollVoteRepository;
 import com.openisle.service.CommentService;
 import com.openisle.service.ReactionService;
@@ -41,6 +43,7 @@ public class PostMapper {
   private final TagMapper tagMapper;
   private final CategoryMapper categoryMapper;
   private final PollVoteRepository pollVoteRepository;
+  private final FleaMarketItemRepository fleaMarketItemRepository;
 
   public PostSummaryDto toSummaryDto(Post post) {
     PostSummaryDto dto = new PostSummaryDto();
@@ -98,7 +101,11 @@ public class PostMapper {
     dto.setTitle(post.getTitle());
     dto.setContent(post.getContent());
     dto.setCreatedAt(post.getCreatedAt());
-    dto.setAuthor(userMapper.toAuthorDto(post.getAuthor()));
+    dto.setAuthor(
+      post.isAnonymous()
+        ? userMapper.toAnonymousAuthorDto(post.getAnonymousAlias())
+        : userMapper.toAuthorDto(post.getAuthor())
+    );
     dto.setCategory(categoryMapper.toDto(post.getCategory()));
     dto.setTags(post.getTags().stream().map(tagMapper::toDto).collect(Collectors.toList()));
     dto.setViews(post.getViews());
@@ -110,6 +117,11 @@ public class PostMapper {
     dto.setClosed(post.isClosed());
     dto.setVisibleScope(post.getVisibleScope());
     dto.setType(post.getType());
+    dto.setAnonymous(post.isAnonymous());
+    dto.setAnonymousAlias(post.getAnonymousAlias());
+    fleaMarketItemRepository
+      .findByPost(post)
+      .ifPresent(item -> dto.setFleaMarketItem(toFleaDto(item)));
   }
 
   private void applyCommon(Post post, PostSummaryDto dto) {
@@ -118,7 +130,11 @@ public class PostMapper {
     dto.setContent(post.getContent());
 
     dto.setCreatedAt(post.getCreatedAt());
-    dto.setAuthor(userMapper.toAuthorDto(post.getAuthor()));
+    dto.setAuthor(
+      post.isAnonymous()
+        ? userMapper.toAnonymousAuthorDto(post.getAnonymousAlias())
+        : userMapper.toAuthorDto(post.getAuthor())
+    );
     dto.setCategory(categoryMapper.toDto(post.getCategory()));
     dto.setTags(post.getTags().stream().map(tagMapper::toDto).collect(Collectors.toList()));
     dto.setViews(post.getViews());
@@ -127,6 +143,11 @@ public class PostMapper {
     dto.setRssExcluded(post.getRssExcluded() == null || post.getRssExcluded());
     dto.setClosed(post.isClosed());
     dto.setVisibleScope(post.getVisibleScope());
+    dto.setAnonymous(post.isAnonymous());
+    dto.setAnonymousAlias(post.getAnonymousAlias());
+    fleaMarketItemRepository
+      .findByPost(post)
+      .ifPresent(item -> dto.setFleaMarketItem(toFleaDto(item)));
 
     List<ReactionDto> reactions = reactionService
       .getReactionsForPost(post.getId())
@@ -202,5 +223,19 @@ public class PostMapper {
     target.setOptionParticipants(optionParticipants);
     target.setMultiple(Boolean.TRUE.equals(pollPost.getMultiple()));
     return target;
+  }
+
+  private com.openisle.dto.FleaMarketItemDto toFleaDto(FleaMarketItem item) {
+    com.openisle.dto.FleaMarketItemDto dto = new com.openisle.dto.FleaMarketItemDto();
+    dto.setId(item.getId());
+    dto.setPrice(item.getPrice());
+    dto.setTradeLocation(item.getTradeLocation());
+    dto.setContact(item.getContact());
+    dto.setStatus(item.getStatus());
+    dto.setUpdatedAt(item.getUpdatedAt());
+    if (item.getBuyer() != null) {
+      dto.setBuyer(userMapper.toAuthorDto(item.getBuyer()));
+    }
+    return dto;
   }
 }

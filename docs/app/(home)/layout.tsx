@@ -38,7 +38,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
         prefetch: true,
         tabs: [
           {
-            title: "OpenIsle 前端",
+            title: "珞珈论坛前端",
             description: <TabTitle>前端开发文档</TabTitle>,
             url: "/frontend",
             icon: (
@@ -48,7 +48,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
             ),
           },
           {
-            title: "OpenIsle 后端",
+            title: "珞珈论坛后端",
             description: <TabTitle>后端开发文档</TabTitle>,
             url: "/backend",
             icon: (
@@ -58,7 +58,7 @@ export default function Layout({ children }: LayoutProps<"/">) {
             ),
           },
           {
-            title: "OpenIsle API",
+            title: "珞珈论坛 API",
             description: <TabTitle>后端 API 文档</TabTitle>,
             url: "/openapi",
             icon: (

@@ -1,6 +1,6 @@
 import type { MediaAdapter } from "fumadocs-openapi";
 
-export const OpenIsleMediaAdapter: MediaAdapter = {
+export const WhuForumMediaAdapter: MediaAdapter = {
   encode(data) {
     return JSON.stringify(data.body);
   },

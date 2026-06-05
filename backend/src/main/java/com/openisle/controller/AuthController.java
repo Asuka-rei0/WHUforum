@@ -9,15 +9,18 @@ import com.openisle.model.User;
 import com.openisle.repository.UserRepository;
 import com.openisle.service.*;
 import com.openisle.util.VerifyType;
+import io.jsonwebtoken.JwtException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.HttpStatus;
@@ -27,13 +30,13 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
+@Slf4j
 public class AuthController {
 
   private final UserService userService;
   private final JwtService jwtService;
   private final EmailSender emailService;
   private final CaptchaService captchaService;
-  private final GoogleAuthService googleAuthService;
   private final GithubAuthService githubAuthService;
   private final DiscordAuthService discordAuthService;
   private final TwitterAuthService twitterAuthService;
@@ -52,6 +55,35 @@ public class AuthController {
   @Value("${app.captcha.login-enabled:false}")
   private boolean loginCaptchaEnabled;
 
+  @Value("${app.whu.mode:true}")
+  private boolean whuMode;
+
+  private boolean emailAuthOnly = true;
+
+  @GetMapping("/cas/authorize")
+  @Operation(summary = "CAS login disabled", description = "WHUforum uses email/password login")
+  @ApiResponse(
+    responseCode = "403",
+    description = "Email login only",
+    content = @Content(schema = @Schema(implementation = Map.class))
+  )
+  public ResponseEntity<?> casAuthorize(
+    @RequestParam(value = "mockCampusId", required = false) String mockCampusId
+  ) {
+    return emailAuthOnlyResponse();
+  }
+
+  @PostMapping("/cas/callback")
+  @Operation(summary = "CAS login disabled", description = "WHUforum uses email/password login")
+  @ApiResponse(
+    responseCode = "403",
+    description = "Email login only",
+    content = @Content(schema = @Schema(implementation = Map.class))
+  )
+  public ResponseEntity<?> casCallback(@RequestBody Map<String, Object> req) {
+    return emailAuthOnlyResponse();
+  }
+
   @PostMapping("/register")
   @Operation(summary = "Register user", description = "Register a new user account")
   @ApiResponse(
@@ -60,6 +92,19 @@ public class AuthController {
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> register(@RequestBody RegisterRequest req) {
+    String email = normalizeRegistrationEmail(req.getEmail());
+    if (!isWhuEmail(email)) {
+      return ResponseEntity.badRequest().body(
+        Map.of(
+          "field",
+          "email",
+          "error",
+          "Only @whu.edu.cn email registration is supported",
+          "reason_code",
+          "WHU_EMAIL_REQUIRED"
+        )
+      );
+    }
     if (captchaEnabled && registerCaptchaEnabled && !captchaService.verify(req.getCaptcha())) {
       return ResponseEntity.badRequest().body(Map.of("error", "Invalid captcha"));
     }
@@ -69,11 +114,7 @@ public class AuthController {
         return ResponseEntity.badRequest().body(Map.of("error", "邀请码使用次数过多"));
       }
       try {
-        User user = userService.registerWithInvite(
-          req.getUsername(),
-          req.getEmail(),
-          req.getPassword()
-        );
+        User user = userService.registerWithInvite(req.getUsername(), email, req.getPassword());
         inviteService.consume(req.getInviteToken(), user.getUsername());
         // 发送确认邮件
         userService.sendVerifyMail(user, VerifyType.REGISTER);
@@ -86,16 +127,7 @@ public class AuthController {
           )
         );
       } catch (EmailSendException e) {
-        return ResponseEntity
-          .status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(
-            Map.of(
-              "error",
-              "邮件发送失败: " + e.getMessage(),
-              "reason_code",
-              "EMAIL_SEND_FAILED"
-            )
-          );
+        return emailSendFailureResponse(e);
       } catch (FieldException e) {
         return ResponseEntity.badRequest().body(
           Map.of("field", e.getField(), "error", e.getMessage())
@@ -104,7 +136,7 @@ public class AuthController {
     }
     User user = userService.register(
       req.getUsername(),
-      req.getEmail(),
+      email,
       req.getPassword(),
       "",
       registerModeService.getRegisterMode()
@@ -113,21 +145,12 @@ public class AuthController {
     try {
       userService.sendVerifyMail(user, VerifyType.REGISTER);
     } catch (EmailSendException e) {
-      return ResponseEntity
-        .status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(
-          Map.of(
-            "error",
-            "邮件发送失败: " + e.getMessage(),
-            "reason_code",
-            "EMAIL_SEND_FAILED"
-          )
-        );
+      return emailSendFailureResponse(e);
     }
     if (!user.isApproved()) {
       notificationService.createRegisterRequestNotifications(user, user.getRegisterReason());
     }
-    return ResponseEntity.ok(Map.of("message", "Verification code sent"));
+    return ResponseEntity.ok(Map.of("message", "Activation email sent", "email", user.getEmail()));
   }
 
   @PostMapping("/verify")
@@ -144,37 +167,30 @@ public class AuthController {
     }
     boolean ok = userService.verifyCode(userOpt.get(), req.getCode(), VerifyType.REGISTER);
     if (ok) {
-      User user = userOpt.get();
-
-      if (user.isApproved()) {
-        return ResponseEntity.ok(
-          Map.of(
-            "message",
-            "Verified and isApproved",
-            "reason_code",
-            "VERIFIED_AND_APPROVED",
-            "token",
-            jwtService.generateToken(req.getUsername())
-          )
-        );
-      } else {
-        return ResponseEntity.ok(
-          Map.of(
-            "message",
-            "Verified",
-            "reason_code",
-            "VERIFIED",
-            "token",
-            jwtService.generateReasonToken(req.getUsername())
-          )
-        );
-      }
+      return verifiedResponse(userOpt.get());
     }
     return ResponseEntity.badRequest().body(Map.of("error", "Invalid verification code"));
   }
 
+  @PostMapping("/activate")
+  @Operation(summary = "Activate account", description = "Activate registration by email link")
+  @ApiResponse(
+    responseCode = "200",
+    description = "Activation result",
+    content = @Content(schema = @Schema(implementation = Map.class))
+  )
+  public ResponseEntity<?> activate(@RequestBody ActivateRequest req) {
+    Optional<User> userOpt = userService.activateRegisterToken(req == null ? null : req.getToken());
+    if (userOpt.isEmpty()) {
+      return ResponseEntity.badRequest().body(
+        Map.of("error", "Invalid or expired activation token")
+      );
+    }
+    return verifiedResponse(userOpt.get());
+  }
+
   @PostMapping("/login")
-  @Operation(summary = "Login", description = "Authenticate with username/email and password")
+  @Operation(summary = "Login", description = "Authenticate with registered WHU email and password")
   @ApiResponse(
     responseCode = "200",
     description = "Authentication result",
@@ -184,10 +200,20 @@ public class AuthController {
     if (captchaEnabled && loginCaptchaEnabled && !captchaService.verify(req.getCaptcha())) {
       return ResponseEntity.badRequest().body(Map.of("error", "Invalid captcha"));
     }
-    Optional<User> userOpt = userService.findByUsername(req.getUsername());
-    if (userOpt.isEmpty()) {
-      userOpt = userService.findByEmail(req.getUsername());
+    String email = normalizeLoginEmail(req);
+    if (!isWhuEmail(email)) {
+      return ResponseEntity.badRequest().body(
+        Map.of(
+          "field",
+          "email",
+          "error",
+          "Please login with a registered @whu.edu.cn email",
+          "reason_code",
+          "WHU_EMAIL_REQUIRED"
+        )
+      );
     }
+    Optional<User> userOpt = userService.findByEmail(email);
     if (userOpt.isEmpty() || !userService.matchesPassword(userOpt.get(), req.getPassword())) {
       return ResponseEntity.badRequest().body(
         Map.of("error", "Invalid credentials", "reason_code", "INVALID_CREDENTIALS")
@@ -195,27 +221,10 @@ public class AuthController {
     }
     User user = userOpt.get();
     if (!user.isVerified()) {
-      user =
-        userService.register(
-          user.getUsername(),
-          user.getEmail(),
-          user.getPassword(),
-          user.getRegisterReason(),
-          registerModeService.getRegisterMode()
-        );
       try {
         userService.sendVerifyMail(user, VerifyType.REGISTER);
       } catch (EmailSendException e) {
-        return ResponseEntity
-          .status(HttpStatus.INTERNAL_SERVER_ERROR)
-          .body(
-            Map.of(
-              "error",
-              "Failed to send verification email: " + e.getMessage(),
-              "reason_code",
-              "EMAIL_SEND_FAILED"
-            )
-          );
+        return emailSendFailureResponse(e);
       }
       return ResponseEntity.badRequest().body(
         Map.of(
@@ -251,81 +260,14 @@ public class AuthController {
   }
 
   @PostMapping("/google")
-  @Operation(summary = "Login with Google", description = "Authenticate using Google account")
+  @Operation(summary = "Google login disabled", description = "WHUforum uses email/password login")
   @ApiResponse(
-    responseCode = "200",
-    description = "Authentication result",
+    responseCode = "403",
+    description = "Email login only",
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> loginWithGoogle(@RequestBody GoogleLoginRequest req) {
-    boolean viaInvite = req.getInviteToken() != null && !req.getInviteToken().isEmpty();
-    InviteService.InviteValidateResult inviteValidateResult = inviteService.validate(
-      req.getInviteToken()
-    );
-    if (viaInvite && !inviteValidateResult.isValidate()) {
-      return ResponseEntity.badRequest().body(Map.of("error", "Invalid invite token"));
-    }
-    Optional<AuthResult> resultOpt = googleAuthService.authenticate(
-      req.getIdToken(),
-      registerModeService.getRegisterMode(),
-      viaInvite
-    );
-    if (resultOpt.isPresent()) {
-      AuthResult result = resultOpt.get();
-      if (viaInvite && result.isNewUser()) {
-        inviteService.consume(
-          req.getInviteToken(),
-          inviteValidateResult.getInviteToken().getInviter().getUsername()
-        );
-        return ResponseEntity.ok(
-          Map.of(
-            "token",
-            jwtService.generateToken(result.getUser().getUsername()),
-            "reason_code",
-            "INVITE_APPROVED"
-          )
-        );
-      }
-      if (RegisterMode.DIRECT.equals(registerModeService.getRegisterMode())) {
-        return ResponseEntity.ok(
-          Map.of("token", jwtService.generateToken(result.getUser().getUsername()))
-        );
-      }
-      if (!result.getUser().isApproved()) {
-        if (
-          result.getUser().getRegisterReason() != null &&
-          !result.getUser().getRegisterReason().isEmpty()
-        ) {
-          return ResponseEntity.badRequest().body(
-            Map.of(
-              "error",
-              "Account awaiting approval",
-              "reason_code",
-              "IS_APPROVING",
-              "token",
-              jwtService.generateReasonToken(result.getUser().getUsername())
-            )
-          );
-        }
-        return ResponseEntity.badRequest().body(
-          Map.of(
-            "error",
-            "Account awaiting approval",
-            "reason_code",
-            "NOT_APPROVED",
-            "token",
-            jwtService.generateReasonToken(result.getUser().getUsername())
-          )
-        );
-      }
-
-      return ResponseEntity.ok(
-        Map.of("token", jwtService.generateToken(result.getUser().getUsername()))
-      );
-    }
-    return ResponseEntity.badRequest().body(
-      Map.of("error", "Invalid google token", "reason_code", "INVALID_CREDENTIALS")
-    );
+    return emailAuthOnlyResponse();
   }
 
   @PostMapping("/reason")
@@ -364,13 +306,16 @@ public class AuthController {
   }
 
   @PostMapping("/github")
-  @Operation(summary = "Login with GitHub", description = "Authenticate using GitHub account")
+  @Operation(summary = "GitHub login disabled", description = "WHUforum uses email/password login")
   @ApiResponse(
-    responseCode = "200",
-    description = "Authentication result",
+    responseCode = "403",
+    description = "Email login only",
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> loginWithGithub(@RequestBody GithubLoginRequest req) {
+    if (emailAuthOnly || whuMode) {
+      return emailAuthOnlyResponse();
+    }
     boolean viaInvite = req.getInviteToken() != null && !req.getInviteToken().isEmpty();
     InviteService.InviteValidateResult inviteValidateResult = inviteService.validate(
       req.getInviteToken()
@@ -444,13 +389,16 @@ public class AuthController {
   }
 
   @PostMapping("/discord")
-  @Operation(summary = "Login with Discord", description = "Authenticate using Discord account")
+  @Operation(summary = "Discord login disabled", description = "WHUforum uses email/password login")
   @ApiResponse(
-    responseCode = "200",
-    description = "Authentication result",
+    responseCode = "403",
+    description = "Email login only",
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> loginWithDiscord(@RequestBody DiscordLoginRequest req) {
+    if (emailAuthOnly || whuMode) {
+      return emailAuthOnlyResponse();
+    }
     boolean viaInvite = req.getInviteToken() != null && !req.getInviteToken().isEmpty();
     InviteService.InviteValidateResult inviteValidateResult = inviteService.validate(
       req.getInviteToken()
@@ -523,13 +471,16 @@ public class AuthController {
   }
 
   @PostMapping("/twitter")
-  @Operation(summary = "Login with Twitter", description = "Authenticate using Twitter account")
+  @Operation(summary = "Twitter login disabled", description = "WHUforum uses email/password login")
   @ApiResponse(
-    responseCode = "200",
-    description = "Authentication result",
+    responseCode = "403",
+    description = "Email login only",
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> loginWithTwitter(@RequestBody TwitterLoginRequest req) {
+    if (emailAuthOnly || whuMode) {
+      return emailAuthOnlyResponse();
+    }
     boolean viaInvite = req.getInviteToken() != null && !req.getInviteToken().isEmpty();
     InviteService.InviteValidateResult inviteValidateResult = inviteService.validate(
       req.getInviteToken()
@@ -603,13 +554,19 @@ public class AuthController {
   }
 
   @PostMapping("/telegram")
-  @Operation(summary = "Login with Telegram", description = "Authenticate using Telegram data")
+  @Operation(
+    summary = "Telegram login disabled",
+    description = "WHUforum uses email/password login"
+  )
   @ApiResponse(
-    responseCode = "200",
-    description = "Authentication result",
+    responseCode = "403",
+    description = "Email login only",
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> loginWithTelegram(@RequestBody TelegramLoginRequest req) {
+    if (emailAuthOnly || whuMode) {
+      return emailAuthOnlyResponse();
+    }
     boolean viaInvite = req.getInviteToken() != null && !req.getInviteToken().isEmpty();
     InviteService.InviteValidateResult inviteValidateResult = inviteService.validate(
       req.getInviteToken()
@@ -692,32 +649,37 @@ public class AuthController {
   }
 
   @PostMapping("/forgot/send")
-  @Operation(summary = "Send reset code", description = "Send verification code for password reset")
+  @Operation(summary = "Send reset link", description = "Send password reset link by email")
   @ApiResponse(
     responseCode = "200",
     description = "Sending result",
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> sendReset(@RequestBody ForgotPasswordRequest req) {
-    Optional<User> userOpt = userService.findByEmail(req.getEmail());
+    String email = normalizeRegistrationEmail(req.getEmail());
+    if (!isWhuEmail(email)) {
+      return ResponseEntity.badRequest().body(
+        Map.of(
+          "field",
+          "email",
+          "error",
+          "Please use your @whu.edu.cn email",
+          "reason_code",
+          "WHU_EMAIL_REQUIRED"
+        )
+      );
+    }
+    Optional<User> userOpt = userService.findByEmail(email);
     if (userOpt.isEmpty()) {
       return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
     }
     try {
-      userService.sendVerifyMail(userOpt.get(), VerifyType.RESET_PASSWORD);
+      User user = userOpt.get();
+      userService.sendPasswordResetMail(user, jwtService.generateResetToken(user.getUsername()));
     } catch (EmailSendException e) {
-      return ResponseEntity
-        .status(HttpStatus.INTERNAL_SERVER_ERROR)
-        .body(
-          Map.of(
-            "error",
-            "邮件发送失败: " + e.getMessage(),
-            "reason_code",
-            "EMAIL_SEND_FAILED"
-          )
-        );
+      return emailSendFailureResponse(e);
     }
-    return ResponseEntity.ok(Map.of("message", "Verification code sent"));
+    return ResponseEntity.ok(Map.of("message", "Password reset email sent"));
   }
 
   @PostMapping("/forgot/verify")
@@ -728,13 +690,14 @@ public class AuthController {
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> verifyReset(@RequestBody VerifyForgotRequest req) {
-    Optional<User> userOpt = userService.findByEmail(req.getEmail());
+    String email = normalizeRegistrationEmail(req.getEmail());
+    Optional<User> userOpt = userService.findByEmail(email);
     if (userOpt.isEmpty()) {
       return ResponseEntity.badRequest().body(Map.of("error", "User not found"));
     }
     boolean ok = userService.verifyCode(userOpt.get(), req.getCode(), VerifyType.RESET_PASSWORD);
     if (ok) {
-      String username = userService.findByEmail(req.getEmail()).get().getUsername();
+      String username = userOpt.get().getUsername();
       return ResponseEntity.ok(Map.of("token", jwtService.generateResetToken(username)));
     }
     return ResponseEntity.badRequest().body(Map.of("error", "Invalid verification code"));
@@ -748,7 +711,14 @@ public class AuthController {
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> resetPassword(@RequestBody ResetPasswordRequest req) {
-    String username = jwtService.validateAndGetSubjectForReset(req.getToken());
+    String username;
+    try {
+      username = jwtService.validateAndGetSubjectForReset(req.getToken());
+    } catch (JwtException | IllegalArgumentException e) {
+      return ResponseEntity.badRequest().body(
+        Map.of("error", "Invalid or expired reset token", "reason_code", "INVALID_RESET_TOKEN")
+      );
+    }
     try {
       userService.updatePassword(username, req.getPassword());
       return ResponseEntity.ok(Map.of("message", "Password updated"));
@@ -757,6 +727,72 @@ public class AuthController {
         Map.of("field", e.getField(), "error", e.getMessage())
       );
     }
+  }
+
+  private ResponseEntity<?> emailAuthOnlyResponse() {
+    return ResponseEntity.status(HttpStatus.FORBIDDEN).body(
+      Map.of(
+        "error",
+        "WHUforum only supports @whu.edu.cn registration and registered email/password login",
+        "reason_code",
+        "EMAIL_AUTH_ONLY"
+      )
+    );
+  }
+
+  private ResponseEntity<?> verifiedResponse(User user) {
+    if (user.isApproved()) {
+      return ResponseEntity.ok(
+        Map.of(
+          "message",
+          "Verified and isApproved",
+          "reason_code",
+          "VERIFIED_AND_APPROVED",
+          "token",
+          jwtService.generateToken(user.getUsername())
+        )
+      );
+    }
+    return ResponseEntity.ok(
+      Map.of(
+        "message",
+        "Verified",
+        "reason_code",
+        "VERIFIED",
+        "token",
+        jwtService.generateReasonToken(user.getUsername())
+      )
+    );
+  }
+
+  private ResponseEntity<?> emailSendFailureResponse(EmailSendException e) {
+    log.warn("Email send failed: {}", e.getMessage());
+    return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(
+      Map.of("error", "邮件发送失败，请稍后再试或联系管理员。", "reason_code", "EMAIL_SEND_FAILED")
+    );
+  }
+
+  private String normalizeLoginEmail(LoginRequest req) {
+    if (req == null) {
+      return "";
+    }
+    String email = req.getEmail();
+    if (email == null || email.isBlank()) {
+      email = req.getUsername();
+    }
+    return normalizeRegistrationEmail(email);
+  }
+
+  private String normalizeRegistrationEmail(String email) {
+    return email == null ? "" : email.trim().toLowerCase(Locale.ROOT);
+  }
+
+  private boolean isWhuEmail(String email) {
+    return email != null && email.endsWith("@whu.edu.cn");
+  }
+
+  private String normalizeOptionalToken(String token) {
+    return token == null ? "" : token.trim();
   }
 
   // DTO classes moved to com.openisle.dto package

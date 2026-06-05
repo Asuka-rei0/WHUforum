@@ -213,7 +213,7 @@ async function fetchChannels() {
     channels.value = data
     setChannelUnreadFromList(data)
   } catch (e) {
-    toast.error(e.message)
+    toast.error('频道列表加载失败，请稍后重试')
   } finally {
     loadingChannels.value = false
   }
@@ -244,7 +244,7 @@ async function goToChannel(id) {
       navigateTo(`/message-box/${id}`)
     }
   } catch (e) {
-    toast.error(e.message)
+    toast.error('进入频道失败，请稍后重试')
   }
 }
 

@@ -10,6 +10,8 @@ import org.springframework.data.repository.query.Param;
 public interface UserRepository extends JpaRepository<User, Long> {
   Optional<User> findByUsername(String username);
   Optional<User> findByEmail(String email);
+  Optional<User> findByCasSubject(String casSubject);
+  Optional<User> findByCampusIdHash(String campusIdHash);
   java.util.List<User> findByUsernameContainingIgnoreCase(String keyword);
   java.util.List<User> findByRole(com.openisle.model.Role role);
   long countByExperienceGreaterThanEqual(int experience);

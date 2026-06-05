@@ -84,4 +84,10 @@ public class Post {
 
   @Column(nullable = true)
   private LocalDateTime lastReplyAt;
+
+  @Column(nullable = false)
+  private boolean anonymous = false;
+
+  @Column(length = 80)
+  private String anonymousAlias;
 }

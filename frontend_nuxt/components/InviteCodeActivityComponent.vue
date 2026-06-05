@@ -29,6 +29,7 @@
 
 <script setup>
 import { toast } from '~/main'
+import { getApiErrorMessage } from '~/utils/apiError'
 import { fetchCurrentUser, getToken } from '~/utils/auth'
 
 const config = useRuntimeConfig()
@@ -72,7 +73,7 @@ const fetchInvite = async (showToast = true) => {
       if (showToast) toast.success('邀请链接已生成')
     } else {
       const data = await res.json().catch(() => ({}))
-      toast.error(data.error || '生成邀请链接失败')
+      toast.error(getApiErrorMessage(data, '生成邀请链接失败，请稍后重试'))
     }
   } catch (e) {
     toast.error('生成邀请链接失败')

@@ -29,4 +29,7 @@ public class UserDto {
   private int currentLevel;
   private int nextLevelExp;
   private boolean bot;
+  private boolean campusVerified;
+  private String campusPersonType;
+  private String department;
 }

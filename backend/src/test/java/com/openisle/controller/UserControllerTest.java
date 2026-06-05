@@ -8,6 +8,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.openisle.dto.CommentInfoDto;
 import com.openisle.dto.PostMetaDto;
 import com.openisle.dto.UserDto;
+import com.openisle.exception.FieldException;
 import com.openisle.mapper.CategoryMapper;
 import com.openisle.mapper.TagMapper;
 import com.openisle.mapper.UserMapper;
@@ -58,6 +59,9 @@ class UserControllerTest {
 
   @MockBean
   private JwtService jwtService;
+
+  @MockBean
+  private PostReadService postReadService;
 
   @MockBean
   private UserMapper userMapper;
@@ -133,6 +137,39 @@ class UserControllerTest {
       .andExpect(jsonPath("$.error").value("File is not an image"));
 
     Mockito.verify(imageUploader, Mockito.never()).upload(any(), any());
+  }
+
+  @Test
+  void deleteCurrentUserWithPassword() throws Exception {
+    mockMvc
+      .perform(
+        delete("/api/users/me")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content("{\"password\":\"secret\"}")
+          .principal(new UsernamePasswordAuthenticationToken("alice", "p"))
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.message").value("Account deleted"));
+
+    Mockito.verify(userService).deleteAccount("alice", "secret");
+  }
+
+  @Test
+  void deleteCurrentUserRejectsWrongPassword() throws Exception {
+    Mockito.doThrow(new FieldException("password", "Invalid password"))
+      .when(userService)
+      .deleteAccount("alice", "bad");
+
+    mockMvc
+      .perform(
+        delete("/api/users/me")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content("{\"password\":\"bad\"}")
+          .principal(new UsernamePasswordAuthenticationToken("alice", "p"))
+      )
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.field").value("password"))
+      .andExpect(jsonPath("$.reason_code").value("INVALID_PASSWORD"));
   }
 
   @Test

@@ -29,6 +29,9 @@ public class JwtService {
   @Value("${app.jwt.expiration}")
   private long expiration;
 
+  @Value("${app.jwt.reset-expiration:1800000}")
+  private long resetExpiration;
+
   private Key getSigningKeyForSecret(String signSecret) {
     try {
       MessageDigest digest = MessageDigest.getInstance("SHA-256");
@@ -63,7 +66,7 @@ public class JwtService {
 
   public String generateResetToken(String subject) {
     Date now = new Date();
-    Date expiryDate = new Date(now.getTime() + expiration);
+    Date expiryDate = new Date(now.getTime() + resetExpiration);
     return Jwts.builder()
       .setSubject(subject)
       .setIssuedAt(now)

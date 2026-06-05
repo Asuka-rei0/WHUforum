@@ -16,7 +16,7 @@
 }
 
 @media (max-width: 768px) {
-  .Vue-Toastification__container.open-isle-toast-style-v1 {
+  .Vue-Toastification__container.whuforum-toast-style-v1 {
     width: auto;
     max-width: 90vw;
     right: 0.5em;

@@ -47,6 +47,8 @@ public class CachingConfig {
   public static final String VISIT_CACHE_NAME = "openisle_visit";
   // 文章缓存
   public static final String POST_CACHE_NAME = "openisle_posts";
+  // Search result cache
+  public static final String SEARCH_CACHE_NAME = "openisle_search";
 
   /**
    * 自定义Redis的序列化器
@@ -108,6 +110,7 @@ public class CachingConfig {
     cacheConfigs.put(TAG_CACHE_NAME, oneHourConfig);
     cacheConfigs.put(CATEGORY_CACHE_NAME, oneHourConfig);
     cacheConfigs.put(POST_CACHE_NAME, tenMinutesConfig);
+    cacheConfigs.put(SEARCH_CACHE_NAME, tenMinutesConfig);
 
     return RedisCacheManager.builder(connectionFactory)
       .cacheDefaults(config)

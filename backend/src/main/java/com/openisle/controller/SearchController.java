@@ -1,5 +1,6 @@
 package com.openisle.controller;
 
+import com.openisle.config.CachingConfig;
 import com.openisle.dto.PostSummaryDto;
 import com.openisle.dto.SearchResultDto;
 import com.openisle.dto.UserDto;
@@ -14,6 +15,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -95,6 +97,7 @@ public class SearchController {
   }
 
   @GetMapping("/global")
+  @Cacheable(value = CachingConfig.SEARCH_CACHE_NAME, key = "'global:' + #keyword")
   @Operation(summary = "Global search", description = "Search users and posts globally")
   @ApiResponse(
     responseCode = "200",

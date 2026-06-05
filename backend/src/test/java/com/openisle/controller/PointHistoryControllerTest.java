@@ -12,6 +12,7 @@ import com.openisle.model.User;
 import com.openisle.repository.UserRepository;
 import com.openisle.service.JwtService;
 import com.openisle.service.PointService;
+import com.openisle.service.UserVisitService;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -43,6 +44,9 @@ class PointHistoryControllerTest {
 
   @MockBean
   private PointHistoryMapper pointHistoryMapper;
+
+  @MockBean
+  private UserVisitService userVisitService;
 
   @Test
   void trendReturnsSeries() throws Exception {

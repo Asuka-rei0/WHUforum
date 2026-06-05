@@ -55,10 +55,18 @@ public class CommentService {
   private final PointService pointService;
   private final ImageUploader imageUploader;
   private final SearchIndexEventPublisher searchIndexEventPublisher;
+  private final AnonymousAuditService anonymousAuditService;
+  private final ModerationService moderationService;
 
   @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
   @Transactional
   public Comment addComment(String username, Long postId, String content) {
+    return addComment(username, postId, content, false);
+  }
+
+  @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
+  @Transactional
+  public Comment addComment(String username, Long postId, String content, boolean anonymous) {
     log.debug("addComment called by user {} for post {}", username, postId);
     long recent = commentRepository.countByAuthorAfter(
       username,
@@ -77,11 +85,27 @@ public class CommentService {
     if (post.isClosed()) {
       throw new IllegalStateException("Post closed");
     }
+    ModerationService.ModerationResult moderation = moderationService.inspect(content);
+    if (moderation.flagged() && !moderation.crisis()) {
+      throw new IllegalArgumentException("Comment contains sensitive content");
+    }
     Comment comment = new Comment();
     comment.setAuthor(author);
     comment.setPost(post);
     comment.setContent(content);
+    comment.setAnonymous(anonymous || post.isAnonymous());
+    if (comment.isAnonymous()) {
+      comment.setAnonymousAlias(anonymousAuditService.createAlias());
+    }
     comment = commentRepository.save(comment);
+    if (comment.isAnonymous()) {
+      anonymousAuditService.recordComment(
+        comment,
+        author,
+        comment.getAnonymousAlias(),
+        "anonymous comment"
+      );
+    }
     log.debug("Comment {} saved for post {}", comment.getId(), postId);
 
     // Update post comment statistics
@@ -129,6 +153,9 @@ public class CommentService {
       }
     }
     notificationService.notifyMentions(content, author, post, comment);
+    if (moderation.crisis()) {
+      notifyModerationAdmins(author, post, comment, moderation);
+    }
     log.debug("addComment finished for comment {}", comment.getId());
     searchIndexEventPublisher.publishCommentSaved(comment);
     return comment;
@@ -142,6 +169,12 @@ public class CommentService {
   @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
   @Transactional
   public Comment addReply(String username, Long parentId, String content) {
+    return addReply(username, parentId, content, false);
+  }
+
+  @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
+  @Transactional
+  public Comment addReply(String username, Long parentId, String content, boolean anonymous) {
     log.debug("addReply called by user {} for parent comment {}", username, parentId);
     long recent = commentRepository.countByAuthorAfter(
       username,
@@ -160,12 +193,28 @@ public class CommentService {
     if (parent.getPost().isClosed()) {
       throw new IllegalStateException("Post closed");
     }
+    ModerationService.ModerationResult moderation = moderationService.inspect(content);
+    if (moderation.flagged() && !moderation.crisis()) {
+      throw new IllegalArgumentException("Comment contains sensitive content");
+    }
     Comment comment = new Comment();
     comment.setAuthor(author);
     comment.setPost(parent.getPost());
     comment.setParent(parent);
     comment.setContent(content);
+    comment.setAnonymous(anonymous || parent.getPost().isAnonymous());
+    if (comment.isAnonymous()) {
+      comment.setAnonymousAlias(anonymousAuditService.createAlias());
+    }
     comment = commentRepository.save(comment);
+    if (comment.isAnonymous()) {
+      anonymousAuditService.recordComment(
+        comment,
+        author,
+        comment.getAnonymousAlias(),
+        "anonymous reply"
+      );
+    }
     log.debug("Reply {} saved for parent {}", comment.getId(), parentId);
 
     // Update post comment statistics
@@ -227,9 +276,32 @@ public class CommentService {
       }
     }
     notificationService.notifyMentions(content, author, parent.getPost(), comment);
+    if (moderation.crisis()) {
+      notifyModerationAdmins(author, parent.getPost(), comment, moderation);
+    }
     log.debug("addReply finished for comment {}", comment.getId());
     searchIndexEventPublisher.publishCommentSaved(comment);
     return comment;
+  }
+
+  private void notifyModerationAdmins(
+    User author,
+    Post post,
+    Comment comment,
+    ModerationService.ModerationResult moderation
+  ) {
+    for (User admin : userRepository.findByRole(Role.ADMIN)) {
+      notificationService.createNotification(
+        admin,
+        NotificationType.MODERATION_ALERT,
+        post,
+        comment,
+        true,
+        author,
+        null,
+        "评论触发危机词: " + moderation.matchedWord()
+      );
+    }
   }
 
   public List<Comment> getCommentsForPost(Long postId, CommentSort sort) {

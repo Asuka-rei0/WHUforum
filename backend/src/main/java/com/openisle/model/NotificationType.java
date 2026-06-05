@@ -56,4 +56,8 @@ public enum NotificationType {
   DONATION,
   /** You were mentioned in a post or comment */
   MENTION,
+  /** Flea market item status changed */
+  FLEA_MARKET_STATUS,
+  /** A moderation rule flagged content for admin review */
+  MODERATION_ALERT,
 }

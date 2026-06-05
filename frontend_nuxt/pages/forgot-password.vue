@@ -3,26 +3,33 @@
     <div class="forgot-content">
       <div class="forgot-title">找回密码</div>
 
-      <div v-if="step === 0" class="step-content">
-        <BaseInput icon="mail" v-model="email" placeholder="邮箱" />
+      <form class="step-content" @submit.prevent="sendResetLink">
+        <BaseInput
+          icon="mail"
+          v-model="email"
+          type="email"
+          autocomplete="email"
+          placeholder="name@whu.edu.cn"
+          :disabled="emailSent"
+        />
         <div v-if="emailError" class="error-message">{{ emailError }}</div>
-        <div class="primary-button" @click="sendCode" v-if="!isSending">发送验证码</div>
-        <div class="primary-button disabled" v-else>发送中...</div>
-      </div>
-      <div v-else-if="step === 1" class="step-content">
-        <BaseInput icon="mail" v-model="code" placeholder="邮箱验证码" />
-        <div class="primary-button" @click="verifyCode" v-if="!isVerifying">验证</div>
-        <div class="primary-button disabled" v-else>验证中...</div>
-      </div>
-      <div v-else class="step-content">
-        <BaseInput icon="lock" v-model="password" type="password" placeholder="新密码" />
-        <div v-if="passwordError" class="error-message">{{ passwordError }}</div>
-        <div class="primary-button" @click="resetPassword" v-if="!isResetting">重置密码</div>
-        <div class="primary-button disabled" v-else>提交中...</div>
-      </div>
+
+        <div v-if="emailSent" class="mail-notice">
+          <div class="notice-title">重置邮件已发送</div>
+          <div class="notice-copy">{{ sentEmail }}</div>
+          <button class="secondary-button" type="button" @click="resetForm({ keepEmail: true })">
+            重新填写邮箱
+          </button>
+        </div>
+
+        <button class="primary-button" type="submit" :disabled="isSending || emailSent">
+          {{ isSending ? '发送中...' : emailSent ? '已发送' : '发送重置链接' }}
+        </button>
+      </form>
+
       <div class="hint-message">
         <info-icon />
-        使用 Google 注册的用户可使用对应的邮箱进行找回密码
+        请输入已注册的 @whu.edu.cn 邮箱找回密码
       </div>
     </div>
   </div>
@@ -31,98 +38,73 @@
 <script setup>
 import { toast } from '~/main'
 import BaseInput from '~/components/BaseInput.vue'
+import { getApiErrorMessage } from '~/utils/apiError'
 import { useRoute } from 'vue-router'
 
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
-
-const step = ref(0)
-const email = ref('')
-const code = ref('')
-const password = ref('')
-const token = ref('')
-const emailError = ref('')
-const passwordError = ref('')
-const isSending = ref(false)
-const isVerifying = ref(false)
-const isResetting = ref(false)
 const route = useRoute()
 
-onMounted(() => {
-  if (route.query.email) {
-    email.value = decodeURIComponent(route.query.email)
+const email = ref('')
+const sentEmail = ref('')
+const emailError = ref('')
+const isSending = ref(false)
+const emailSent = ref(false)
+
+const normalizeEmail = (value) => (value || '').trim().toLowerCase()
+const isWhuEmail = (value) => normalizeEmail(value).endsWith('@whu.edu.cn')
+
+const routeEmail = () => {
+  const rawEmail = Array.isArray(route.query.email) ? route.query.email[0] : route.query.email
+  return normalizeEmail(rawEmail)
+}
+
+const resetForm = ({ keepEmail = false } = {}) => {
+  if (keepEmail) {
+    email.value = normalizeEmail(email.value)
+  } else {
+    email.value = routeEmail()
   }
-})
-const sendCode = async () => {
-  if (!email.value) {
-    emailError.value = '邮箱不能为空'
+  sentEmail.value = ''
+  emailError.value = ''
+  isSending.value = false
+  emailSent.value = false
+}
+
+onMounted(resetForm)
+onActivated(resetForm)
+
+const sendResetLink = async () => {
+  emailError.value = ''
+  const normalizedEmail = normalizeEmail(email.value)
+  if (!isWhuEmail(normalizedEmail)) {
+    emailError.value = '请使用已注册的 @whu.edu.cn 邮箱'
     return
   }
+
   try {
     isSending.value = true
     const res = await fetch(`${API_BASE_URL}/api/auth/forgot/send`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value }),
+      body: JSON.stringify({ email: normalizedEmail }),
     })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      sentEmail.value = normalizedEmail
+      emailSent.value = true
+      toast.success('重置邮件已发送，请查收武汉大学邮箱')
+      return
+    }
+    if (data.field === 'email' || data.reason_code === 'WHU_EMAIL_REQUIRED') {
+      emailError.value = getApiErrorMessage(data, '请使用已注册的 @whu.edu.cn 邮箱')
+      return
+    }
+    toast.error(getApiErrorMessage(data, '请填写已注册邮箱'))
+  } catch (e) {
+    toast.error('发送失败，请稍后重试')
+  } finally {
     isSending.value = false
-    if (res.ok) {
-      toast.success('验证码已发送')
-      step.value = 1
-    } else {
-      toast.error('请填写已注册邮箱')
-    }
-  } catch (e) {
-    isSending.value = false
-    toast.error('发送失败')
-  }
-}
-const verifyCode = async () => {
-  try {
-    isVerifying.value = true
-    const res = await fetch(`${API_BASE_URL}/api/auth/forgot/verify`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: email.value, code: code.value }),
-    })
-    isVerifying.value = false
-    const data = await res.json()
-    if (res.ok) {
-      token.value = data.token
-      step.value = 2
-    } else {
-      toast.error(data.error || '验证失败')
-    }
-  } catch (e) {
-    isVerifying.value = false
-    toast.error('验证失败')
-  }
-}
-const resetPassword = async () => {
-  if (!password.value) {
-    passwordError.value = '密码不能为空'
-    return
-  }
-  try {
-    isResetting.value = true
-    const res = await fetch(`${API_BASE_URL}/api/auth/forgot/reset`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: token.value, password: password.value }),
-    })
-    isResetting.value = false
-    const data = await res.json()
-    if (res.ok) {
-      toast.success('密码已重置')
-      navigateTo('/login', { replace: true })
-    } else if (data.field === 'password') {
-      passwordError.value = data.error
-    } else {
-      toast.error(data.error || '重置失败')
-    }
-  } catch (e) {
-    isResetting.value = false
-    toast.error('重置失败')
   }
 }
 </script>
@@ -134,13 +116,17 @@ const resetPassword = async () => {
   align-items: center;
   background-color: var(--background-color);
   height: 100%;
+  padding: 32px 20px;
+  box-sizing: border-box;
 }
+
 .forgot-content {
   display: flex;
   flex-direction: column;
   gap: 20px;
-  width: 400px;
+  width: min(100%, 400px);
 }
+
 .forgot-title {
   font-size: 24px;
   font-weight: bold;
@@ -160,33 +146,72 @@ const resetPassword = async () => {
   color: var(--primary-color);
   font-size: 14px;
 }
+
 .step-content {
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
+
 .primary-button {
+  border: none;
   background-color: var(--primary-color);
   color: white;
   padding: 10px 20px;
-  border-radius: 10px;
+  border-radius: 8px;
+  min-height: 44px;
   text-align: center;
   cursor: pointer;
+  font-weight: 700;
 }
+
 .primary-button:hover {
   background-color: var(--primary-color-hover);
 }
-.primary-button.disabled {
+
+.primary-button:disabled {
   background-color: var(--primary-color-disabled);
   cursor: not-allowed;
 }
-.error-message {
-  color: red;
-  font-size: 14px;
+
+.secondary-button {
+  border: 1px solid var(--normal-border-color);
+  background: transparent;
+  color: var(--primary-color);
+  padding: 8px 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
 }
-@media (max-width: 768px) {
-  .forgot-content {
-    width: calc(100vw - 40px);
-  }
+
+.secondary-button:hover {
+  background: rgba(0, 92, 70, 0.06);
+}
+
+.mail-notice {
+  border: 1px solid var(--normal-border-color);
+  border-radius: 8px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: center;
+}
+
+.notice-title {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--primary-color);
+}
+
+.notice-copy {
+  font-size: 14px;
+  color: var(--text-color);
+  word-break: break-all;
+}
+
+.error-message {
+  color: #d93025;
+  font-size: 14px;
 }
 </style>

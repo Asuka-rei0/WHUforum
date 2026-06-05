@@ -322,11 +322,11 @@ const submitReply = async (parentUserName, text, clear) => {
     } else if (res.status === 429) {
       toast.error('回复过于频繁，请稍后再试')
     } else {
-      toast.error(`回复失败: ${res.status} ${res.statusText}`)
+      toast.error('回复失败，请稍后再试')
     }
   } catch (e) {
     console.debug('Submit reply error', e)
-    toast.error(`回复失败: ${e.message}`)
+    toast.error('回复失败，请稍后再试')
   } finally {
     isWaitingForReply.value = false
   }

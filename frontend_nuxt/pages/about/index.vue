@@ -18,7 +18,7 @@
             </div>
           </div>
           <div class="about-api-title">API文档和调试入口</div>
-          <a href="http://docs.open-isle.com" target="_blank" rel="noopener" class="about-api-link">
+          <a :href="apiDocsUrl" target="_blank" rel="noopener" class="about-api-link">
             API 文档与 Playground <share />
           </a>
         </div>
@@ -50,26 +50,44 @@ export default {
   name: 'AboutPageView',
   setup() {
     const isFetching = ref(false)
+    const config = useRuntimeConfig()
+    const apiDocsUrl = computed(() => `${config.public.apiBaseUrl}/api/v3/api-docs`)
     const tabs = [
       {
         key: 'about',
         label: '关于',
-        file: 'https://openisle-1307107697.cos.ap-guangzhou.myqcloud.com/assert/about/about.md',
+        content: `# 关于珞珈论坛
+
+珞珈论坛是面向武汉大学师生和校友的校园交流社区。你可以在这里讨论课程与科研、分享校园生活、发布活动信息、进行跳蚤市场交易，也可以通过匿名树洞寻求建议和互助。
+
+论坛仅支持使用 @whu.edu.cn 邮箱注册，登录方式为已注册邮箱与密码。`,
       },
       {
         key: 'agreement',
         label: '用户协议',
-        file: 'https://openisle-1307107697.cos.ap-guangzhou.myqcloud.com/assert/about/agreement.md',
+        content: `# 用户协议
+
+使用珞珈论坛代表你同意遵守武汉大学校园社区的基本规范：尊重他人、保护隐私、理性表达，并对自己发布的内容负责。
+
+请勿发布违法违规、侵权、骚扰、诈骗、恶意引流或泄露他人个人信息的内容。`,
       },
       {
         key: 'guideline',
         label: '创作准则',
-        file: 'https://openisle-1307107697.cos.ap-guangzhou.myqcloud.com/assert/about/guideline.md',
+        content: `# 创作准则
+
+鼓励发布真实、清晰、对同学有帮助的内容。课程讨论请尽量提供背景信息，求助帖请说明已尝试的方法，交易帖请标注价格、地点与状态。
+
+匿名发言仍需遵守社区规则。`,
       },
       {
         key: 'privacy',
         label: '隐私政策',
-        file: 'https://openisle-1307107697.cos.ap-guangzhou.myqcloud.com/assert/about/privacy.md',
+        content: `# 隐私政策
+
+珞珈论坛仅收集账号注册、登录、内容发布和通知所必需的信息。邮箱用于账号识别、验证和找回密码。
+
+请不要在公开帖子、评论或私信中泄露身份证号、学号、手机号、宿舍地址等敏感信息。`,
       },
       {
         key: 'api',
@@ -88,21 +106,11 @@ export default {
       return `${token.value.slice(0, 20)}...${token.value.slice(-10)}`
     })
 
-    const loadContent = async (file) => {
-      if (!file) return
-      try {
-        isFetching.value = true
-        const res = await fetch(file)
-        if (res.ok) {
-          content.value = await res.text()
-        } else {
-          content.value = '# 内容加载失败'
-        }
-      } catch (e) {
-        content.value = '# 内容加载失败'
-      } finally {
-        isFetching.value = false
-      }
+    const loadContent = async (tab) => {
+      if (!tab || !tab.content) return
+      isFetching.value = true
+      content.value = tab.content
+      isFetching.value = false
     }
 
     onMounted(() => {
@@ -110,15 +118,15 @@ export default {
       if (initTab && tabs.find((t) => t.key === initTab)) {
         selectedTab.value = initTab
         const tab = tabs.find((t) => t.key === initTab)
-        if (tab && tab.file) loadContent(tab.file)
+        if (tab && tab.content) loadContent(tab)
       } else {
-        loadContent(tabs[0].file)
+        loadContent(tabs[0])
       }
     })
 
     watch(selectedTab, (name) => {
       const tab = tabs.find((t) => t.key === name)
-      if (tab && tab.file) loadContent(tab.file)
+      if (tab && tab.content) loadContent(tab)
       router.replace({ query: { ...route.query, tab: name } })
     })
 
@@ -157,6 +165,7 @@ export default {
       token,
       copyToken,
       shortToken,
+      apiDocsUrl,
     }
   },
 }

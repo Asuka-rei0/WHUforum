@@ -14,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.ApplicationContext;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.scheduling.TaskScheduler;
 
 class PostServiceTest {
@@ -72,7 +73,11 @@ class PostServiceTest {
       pointHistoryRepository,
       PublishMode.DIRECT,
       redisTemplate,
-      searchIndexEventPublisher
+      searchIndexEventPublisher,
+      mock(CategoryService.class),
+      mock(FleaMarketItemRepository.class),
+      mock(AnonymousAuditService.class),
+      mock(ModerationService.class)
     );
     when(context.getBean(PostService.class)).thenReturn(service);
 
@@ -152,7 +157,11 @@ class PostServiceTest {
       pointHistoryRepository,
       PublishMode.DIRECT,
       redisTemplate,
-      searchIndexEventPublisher
+      searchIndexEventPublisher,
+      mock(CategoryService.class),
+      mock(FleaMarketItemRepository.class),
+      mock(AnonymousAuditService.class),
+      mock(ModerationService.class)
     );
     when(context.getBean(PostService.class)).thenReturn(service);
 
@@ -217,6 +226,7 @@ class PostServiceTest {
     PostChangeLogService postChangeLogService = mock(PostChangeLogService.class);
     PointHistoryRepository pointHistoryRepository = mock(PointHistoryRepository.class);
     RedisTemplate redisTemplate = mock(RedisTemplate.class);
+    ValueOperations valueOperations = mock(ValueOperations.class);
     SearchIndexEventPublisher searchIndexEventPublisher = mock(SearchIndexEventPublisher.class);
 
     PostService service = new PostService(
@@ -245,9 +255,15 @@ class PostServiceTest {
       pointHistoryRepository,
       PublishMode.DIRECT,
       redisTemplate,
-      searchIndexEventPublisher
+      searchIndexEventPublisher,
+      mock(CategoryService.class),
+      mock(FleaMarketItemRepository.class),
+      mock(AnonymousAuditService.class),
+      mock(ModerationService.class)
     );
     when(context.getBean(PostService.class)).thenReturn(service);
+    when(redisTemplate.opsForValue()).thenReturn(valueOperations);
+    when(valueOperations.get(any())).thenReturn("1");
 
     when(postRepo.countByAuthorAfter(eq("alice"), any())).thenReturn(1L);
 
@@ -258,6 +274,9 @@ class PostServiceTest {
         "t",
         "c",
         List.of(1L),
+        null,
+        null,
+        null,
         null,
         null,
         null,
@@ -330,7 +349,11 @@ class PostServiceTest {
       pointHistoryRepository,
       PublishMode.DIRECT,
       redisTemplate,
-      searchIndexEventPublisher
+      searchIndexEventPublisher,
+      mock(CategoryService.class),
+      mock(FleaMarketItemRepository.class),
+      mock(AnonymousAuditService.class),
+      mock(ModerationService.class)
     );
     when(context.getBean(PostService.class)).thenReturn(service);
 
@@ -426,7 +449,11 @@ class PostServiceTest {
       pointHistoryRepository,
       PublishMode.DIRECT,
       redisTemplate,
-      searchIndexEventPublisher
+      searchIndexEventPublisher,
+      mock(CategoryService.class),
+      mock(FleaMarketItemRepository.class),
+      mock(AnonymousAuditService.class),
+      mock(ModerationService.class)
     );
     when(context.getBean(PostService.class)).thenReturn(service);
 

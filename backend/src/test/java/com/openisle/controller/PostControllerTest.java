@@ -15,7 +15,10 @@ import com.openisle.model.*;
 import com.openisle.service.*;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -88,6 +91,14 @@ class PostControllerTest {
   @MockBean
   private com.openisle.repository.PollVoteRepository pollVoteRepository;
 
+  @MockBean
+  private com.openisle.repository.FleaMarketItemRepository fleaMarketItemRepository;
+
+  @BeforeEach
+  void setUp() {
+    when(fleaMarketItemRepository.findByPost(any())).thenReturn(Optional.empty());
+  }
+
   @Test
   void createAndGetPost() throws Exception {
     User user = new User();
@@ -118,6 +129,9 @@ class PostControllerTest {
         eq("t"),
         eq("c"),
         eq(List.of(1L)),
+        isNull(),
+        isNull(),
+        isNull(),
         isNull(),
         isNull(),
         isNull(),
@@ -189,7 +203,15 @@ class PostControllerTest {
     post.setTags(Set.of(tag));
 
     when(
-      postService.updatePost(eq(1L), eq("alice"), eq(1L), eq("t2"), eq("c2"), eq(List.of(1L)))
+      postService.updatePost(
+        eq(1L),
+        eq("alice"),
+        eq(1L),
+        eq("t2"),
+        eq("c2"),
+        eq(List.of(1L)),
+        isNull()
+      )
     ).thenReturn(post);
     when(commentService.getCommentsForPost(eq(1L), any())).thenReturn(List.of());
     when(commentService.getParticipants(anyLong(), anyInt())).thenReturn(List.of());
@@ -233,8 +255,10 @@ class PostControllerTest {
     post.setCategory(cat);
     post.setTags(Set.of(tag));
 
-    when(postService.listPostsByCategories(null, null, null)).thenReturn(List.of(post));
-    when(commentService.getParticipants(anyLong(), anyInt())).thenReturn(List.of());
+    when(categoryService.getSearchCategoryIds(isNull(), isNull())).thenReturn(null);
+    when(tagService.getSearchTagIds(isNull(), isNull())).thenReturn(null);
+    when(postService.defaultListPosts(null, null, null, null)).thenReturn(List.of(post));
+    when(commentService.getParticipantsForPosts(anyList(), anyInt())).thenReturn(Map.of());
     when(reactionService.getReactionsForPost(anyLong())).thenReturn(List.of());
     when(commentService.getLastCommentTime(anyLong())).thenReturn(null);
 
@@ -267,6 +291,9 @@ class PostControllerTest {
       .andExpect(status().isBadRequest());
 
     verify(postService, never()).createPost(
+      any(),
+      any(),
+      any(),
       any(),
       any(),
       any(),

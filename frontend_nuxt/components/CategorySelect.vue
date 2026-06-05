@@ -38,6 +38,9 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
+const isPlaceholderTaxonomy = (item) => /^测试用/.test(item?.name || '')
+const filterCampusTaxonomy = (items) =>
+  Array.isArray(items) ? items.filter((item) => !isPlaceholderTaxonomy(item)) : []
 
 const providedOptions = ref(Array.isArray(props.options) ? [...props.options] : [])
 watch(
@@ -51,7 +54,7 @@ const fetchCategories = async () => {
   const res = await fetch(`${API_BASE_URL}/api/categories`)
   if (!res.ok) return []
   const data = await res.json()
-  return [{ id: '', name: '无分类' }, ...data]
+  return [{ id: '', name: '无分类' }, ...filterCampusTaxonomy(data)]
 }
 
 const isImageIcon = (icon) => {

@@ -10,7 +10,7 @@
         <div class="post-options-left">
           <CategorySelect v-model="selectedCategory" />
           <TagSelect v-model="selectedTags" creatable />
-          <PostVisibleScopeSelect v-model="selectedVisibleScope"/>
+          <PostVisibleScopeSelect v-model="selectedVisibleScope" />
         </div>
         <div class="post-options-right">
           <div class="post-clear" @click="clearPost"><clear-icon /> 清空</div>
@@ -43,6 +43,7 @@ import PostEditor from '~/components/PostEditor.vue'
 import CategorySelect from '~/components/CategorySelect.vue'
 import TagSelect from '~/components/TagSelect.vue'
 import { toast } from '~/main'
+import { getApiErrorMessage } from '~/utils/apiError'
 import { getToken, authState } from '~/utils/auth'
 import LoginOverlay from '~/components/LoginOverlay.vue'
 import PostVisibleScopeSelect from '~/components/PostVisibleScopeSelect.vue'
@@ -113,7 +114,7 @@ const ensureTags = async (token) => {
         } catch (e) {
           data = null
         }
-        toast.error((data && data.error) || '创建标签失败')
+        toast.error(getApiErrorMessage(data, '创建标签失败'))
         throw new Error('create tag failed')
       }
     }
@@ -184,7 +185,7 @@ const submitPost = async () => {
         content: content.value,
         categoryId: selectedCategory.value,
         tagIds: selectedTags.value,
-        postVisibleScopeType:selectedVisibleScope.value
+        postVisibleScopeType: selectedVisibleScope.value,
       }),
     })
     const data = await res.json()
@@ -192,7 +193,7 @@ const submitPost = async () => {
       toast.success('更新成功')
       window.location.href = `/posts/${postId}`
     } else {
-      toast.error(data.error || '更新失败')
+      toast.error(getApiErrorMessage(data, '更新失败，请稍后重试'))
     }
   } catch (e) {
     toast.error('更新失败')

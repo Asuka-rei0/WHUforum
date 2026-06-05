@@ -1,3 +1,5 @@
+import { getApiErrorMessage } from '../utils/apiError'
+
 // 导出一个便捷的 toast 对象
 export const toast = {
   success: async (message) => {
@@ -16,7 +18,7 @@ export const toast = {
       try {
         const { useToast } = await import('vue-toastification')
         const toastInstance = useToast()
-        toastInstance.error(message)
+        toastInstance.error(getApiErrorMessage(message))
       } catch (error) {
         console.warn('Toast not available:', error)
       }

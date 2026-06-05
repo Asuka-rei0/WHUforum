@@ -44,7 +44,9 @@ class CommentServiceTest {
       pointHistoryRepo,
       pointService,
       imageUploader,
-      searchIndexEventPublisher
+      searchIndexEventPublisher,
+      mock(AnonymousAuditService.class),
+      mock(ModerationService.class)
     );
 
     when(commentRepo.countByAuthorAfter(eq("alice"), any())).thenReturn(3L);

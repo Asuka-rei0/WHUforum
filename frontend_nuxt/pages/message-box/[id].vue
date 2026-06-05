@@ -321,8 +321,8 @@ async function fetchMessages(page = 0) {
     }
     updateNearBottom()
   } catch (e) {
-    error.value = e.message
-    toast.error(e.message)
+    error.value = '消息加载失败，请稍后重试'
+    toast.error(error.value)
   } finally {
     loading.value = false
     loadingMore.value = false
@@ -391,7 +391,7 @@ async function sendMessage(content, clearInput) {
     scrollToBottomSmooth()
     newMessagesCount.value = 0
   } catch (e) {
-    toast.error(e.message)
+    toast.error('消息发送失败，请稍后重试')
   } finally {
     sending.value = false
   }
@@ -491,7 +491,8 @@ function applyMessageReactionSync(event) {
   const reaction = event?.reaction
   if (!reaction?.type || !reaction?.user) return
 
-  const sameReaction = (current) => current?.type === reaction.type && current?.user === reaction.user
+  const sameReaction = (current) =>
+    current?.type === reaction.type && current?.user === reaction.user
   if (event.action === 'REMOVED') {
     targetMessage.reactions = targetMessage.reactions.filter((current) => !sameReaction(current))
     return

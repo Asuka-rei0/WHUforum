@@ -37,6 +37,16 @@ By default the server listens on port `8085` and serves MCP over Streamable HTTP
 | `recent_posts` | Retrieve posts created within the last *N* minutes. |
 
 The tools return structured data mirroring the backend DTOs, including highlighted snippets for
-search results, the full comment payload for post replies and comment replies, and detailed
-metadata for recent posts.
+search results, the full comment payload for post replies and comment replies, detailed metadata
+for recent posts, and WHUforum V1 fields such as anonymous aliases and flea market item status.
+
+`create_post` accepts optional WHUforum fields:
+
+- `anonymous`
+- `flea_market`
+- `flea_price`
+- `flea_trade_location`
+- `flea_contact`
+
+`reply_to_post` and `reply_to_comment` accept optional `anonymous`.
 

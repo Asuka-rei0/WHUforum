@@ -70,6 +70,33 @@
         <div v-if="isSaving" class="save-button disabled">保存中...</div>
         <div v-else @click="save" class="save-button">保存</div>
       </div>
+      <div class="danger-section">
+        <div class="setting-title danger-title">账号注销</div>
+        <div class="setting-description">
+          注销后账号将无法继续登录，历史内容会保留为已注销用户。
+        </div>
+        <div class="delete-account-row">
+          <BaseInput
+            icon="lock"
+            v-model="deletePassword"
+            type="password"
+            autocomplete="current-password"
+            @input="deletePasswordError = ''"
+            placeholder="输入当前密码确认注销"
+          />
+          <div v-if="deletePasswordError" class="error-message delete-error">
+            {{ deletePasswordError }}
+          </div>
+          <button
+            class="delete-button"
+            type="button"
+            :disabled="isDeletingAccount"
+            @click="deleteAccount"
+          >
+            {{ isDeletingAccount ? '注销中...' : '注销账号' }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -82,13 +109,18 @@ import Dropdown from '~/components/Dropdown.vue'
 import BaseSwitch from '~/components/BaseSwitch.vue'
 import BaseUserAvatar from '~/components/BaseUserAvatar.vue'
 import { toast } from '~/main'
-import { fetchCurrentUser, getToken, setToken } from '~/utils/auth'
+import { getApiErrorMessage } from '~/utils/apiError'
+import { fetchCurrentUser, getToken, setToken, clearToken } from '~/utils/auth'
 import { frostedState, setFrosted } from '~/utils/frosted'
+import { useConfirm } from '~/composables/useConfirm'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
+const { confirm } = useConfirm()
 const username = ref('')
 const introduction = ref('')
 const usernameError = ref('')
+const deletePassword = ref('')
+const deletePasswordError = ref('')
 const avatar = ref('')
 const avatarFile = ref(null)
 const tempAvatar = ref('')
@@ -101,6 +133,7 @@ const aiFormatLimit = ref(3)
 const registerMode = ref('DIRECT')
 const isLoadingPage = ref(false)
 const isSaving = ref(false)
+const isDeletingAccount = ref(false)
 const frosted = ref(true)
 
 onMounted(async () => {
@@ -209,7 +242,7 @@ const save = async () => {
       if (res.ok) {
         avatar.value = data.url
       } else {
-        toast.error(data.error || '上传失败')
+        toast.error(getApiErrorMessage(data, '头像上传失败，请稍后重试'))
         break
       }
     }
@@ -221,7 +254,7 @@ const save = async () => {
 
     const data = await res.json()
     if (!res.ok) {
-      toast.error(data.error || '保存失败')
+      toast.error(getApiErrorMessage(data, '资料保存失败，请稍后重试'))
       break
     }
     if (data.token) {
@@ -244,6 +277,46 @@ const save = async () => {
   } while (!isSaving.value)
 
   isSaving.value = false
+}
+
+const deleteAccount = async () => {
+  deletePasswordError.value = ''
+  if (!deletePassword.value) {
+    deletePasswordError.value = '请输入当前密码'
+    return
+  }
+
+  const ok = await confirm(
+    '注销账号',
+    '注销后账号将无法继续登录，历史内容会保留为已注销用户。确认继续吗？',
+  )
+  if (!ok) return
+
+  try {
+    isDeletingAccount.value = true
+    const token = getToken()
+    const res = await fetch(`${API_BASE_URL}/api/users/me`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ password: deletePassword.value }),
+    })
+    const data = await res.json().catch(() => ({}))
+    if (res.ok) {
+      clearToken()
+      toast.success('账号已注销')
+      await navigateTo('/login', { replace: true })
+      return
+    }
+    if (data.field === 'password' || data.reason_code === 'INVALID_PASSWORD') {
+      deletePasswordError.value = getApiErrorMessage(data, '当前密码不正确')
+      return
+    }
+    toast.error(getApiErrorMessage(data, '注销失败，请稍后重试'))
+  } catch (e) {
+    toast.error('注销失败，请稍后重试')
+  } finally {
+    isDeletingAccount.value = false
+  }
 }
 </script>
 
@@ -332,6 +405,52 @@ const save = async () => {
 
 .profile-section {
   margin-bottom: 30px;
+}
+
+.danger-section {
+  max-width: 500px;
+  padding-top: 18px;
+  border-top: 1px solid var(--normal-border-color);
+  margin-top: 30px;
+  margin-bottom: 30px;
+}
+
+.danger-title {
+  color: #b42318;
+}
+
+.delete-account-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 360px;
+  margin-top: 12px;
+}
+
+.delete-button {
+  border: none;
+  background: #b42318;
+  color: #fff;
+  padding: 10px 18px;
+  min-height: 40px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 700;
+  align-self: flex-start;
+}
+
+.delete-button:hover {
+  background: #8f1d14;
+}
+
+.delete-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.delete-error {
+  margin: 0;
+  width: 100%;
 }
 
 .buttons {

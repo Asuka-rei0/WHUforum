@@ -30,8 +30,8 @@ export const openapi = createOpenAPI({
   mediaAdapters: {
     // override the default adapter of `application/json`
     "application/json": {
-      ...Adapters.OpenIsleMediaAdapter,
-      client: ClientAdapters.OpenIsleMediaAdapter,
+      ...Adapters.WhuForumMediaAdapter,
+      client: ClientAdapters.WhuForumMediaAdapter,
     },
   },
 });
