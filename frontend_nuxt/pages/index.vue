@@ -13,7 +13,7 @@
         </div>
         <div class="topic-select-container">
           <CategorySelect v-model="selectedCategory" :options="categoryOptions" />
-          <TagSelect v-model="selectedTags" :options="tagOptions" />
+          <TagSelect v-model="selectedTags" :options="tagOptions" :category="selectedCategory" />
         </div>
       </div>
     </div>

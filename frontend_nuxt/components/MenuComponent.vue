@@ -118,7 +118,7 @@
             </div>
             <template v-else>
               <div
-                v-for="t in tagData"
+                v-for="t in filteredTagData"
                 :key="t.id"
                 class="section-item"
                 :class="{ selected: isTagSelected(t.id) }"
@@ -139,17 +139,6 @@
                 <span class="section-item-text"
                   >{{ t.name }} <span class="section-item-text-count">x {{ t.count }}</span></span
                 >
-              </div>
-              <div v-if="hasMoreTags || isLoadingMoreTags" class="section-item more-item">
-                <a
-                  v-if="hasMoreTags && !isLoadingMoreTags"
-                  href="#"
-                  class="more-link"
-                  @click.prevent="loadMoreTags"
-                >
-                  查看更多
-                </a>
-                <span v-else class="more-loading">加载中...</span>
               </div>
             </template>
           </div>
@@ -175,11 +164,16 @@ import { fetchUnreadCount, notificationState } from '~/utils/notification'
 import { useIsMobile } from '~/utils/screen'
 import { cycleTheme, ThemeMode, themeState } from '~/utils/theme'
 import { selectedCategoryGlobal, selectedTagsGlobal } from '~/composables/postFilter'
+import {
+  filterCampusTaxonomy,
+  resolveCategoryName,
+  sortTagsByCategory,
+} from '~/utils/campusTaxonomy'
 
 const isMobile = useIsMobile()
 // 判断当前分类是否被选中
 const isCategorySelected = (id) => {
-  return id === selectedCategoryGlobal.value
+  return String(id ?? '') === String(selectedCategoryGlobal.value ?? '')
 }
 
 // 判断当前标签是否被选中
@@ -187,7 +181,7 @@ const isTagSelected = (id) => {
   const selected = Array.isArray(selectedTagsGlobal.value)
     ? selectedTagsGlobal.value
     : [selectedTagsGlobal.value]
-  return selected.includes(id)
+  return selected.some((value) => String(value) === String(id))
 }
 
 const config = useRuntimeConfig()
@@ -201,9 +195,6 @@ const emit = defineEmits(['item-click'])
 const categoryOpen = ref(true)
 const tagOpen = ref(true)
 const myPoint = ref(null)
-const isPlaceholderTaxonomy = (item) => /^测试用/.test(item?.name || '')
-const filterCampusTaxonomy = (items) =>
-  Array.isArray(items) ? items.filter((item) => !isPlaceholderTaxonomy(item)) : []
 
 /** ✅ 用 useAsyncData 替换原生 fetch，避免 SSR+CSR 二次请求 */
 const {
@@ -222,22 +213,15 @@ const {
   },
 )
 
-const TAG_PAGE_SIZE = 10
-const tagPage = ref(0)
-const hasMoreTags = ref(true)
-const isLoadingMoreTags = ref(false)
-
-const buildTagUrl = (page = 0) => {
+const buildTagUrl = () => {
   const base = API_BASE_URL || (import.meta.client ? window.location.origin : '')
   const url = new URL('/api/tags', base)
-  url.searchParams.set('page', String(page))
-  url.searchParams.set('pageSize', String(TAG_PAGE_SIZE))
   return url.toString()
 }
 
-const fetchTagPage = async (page = 0) => {
+const fetchTags = async () => {
   try {
-    return filterCampusTaxonomy(await $fetch(buildTagUrl(page)))
+    return filterCampusTaxonomy(await $fetch(buildTagUrl()))
   } catch (e) {
     console.error('Failed to fetch tags', e)
     return []
@@ -248,61 +232,18 @@ const {
   data: tagData,
   pending: isLoadingTag,
   error: tagError,
-} = await useAsyncData('menu:tags', () => fetchTagPage(0), {
+} = await useAsyncData('menu:tags', fetchTags, {
   server: true,
   default: () => [],
   staleTime: 5 * 60 * 1000,
 })
 
-const dedupeTags = (list) => Array.from(new Map(list.map((tag) => [tag.id, tag])).values())
-
-const initializeTagState = (val) => {
-  const initial = Array.isArray(val) ? val : []
-  if (!Array.isArray(val)) {
-    tagData.value = []
-  }
-  tagPage.value = 0
-  hasMoreTags.value = initial.length === TAG_PAGE_SIZE
-}
-
-initializeTagState(tagData.value)
-
-watch(
-  tagData,
-  (val, oldVal) => {
-    const next = Array.isArray(val) ? val : []
-    if (!Array.isArray(val)) {
-      tagData.value = []
-    }
-    const shouldReset =
-      !Array.isArray(oldVal) || oldVal.length > next.length || next.length <= TAG_PAGE_SIZE
-    if (shouldReset) {
-      tagPage.value = 0
-      hasMoreTags.value = next.length === TAG_PAGE_SIZE
-    }
-  },
-  { deep: false },
+const selectedCategoryName = computed(() =>
+  resolveCategoryName(selectedCategoryGlobal.value, categoryData.value),
 )
-
-const loadMoreTags = async () => {
-  if (isLoadingMoreTags.value || !hasMoreTags.value) return
-  isLoadingMoreTags.value = true
-  const nextPage = tagPage.value + 1
-  try {
-    const result = await fetchTagPage(nextPage)
-    const data = Array.isArray(result) ? result : []
-    const existing = Array.isArray(tagData.value) ? tagData.value : []
-    tagData.value = dedupeTags([...existing, ...data])
-    tagPage.value = nextPage
-    if (data.length < TAG_PAGE_SIZE) {
-      hasMoreTags.value = false
-    }
-  } catch (e) {
-    console.error('Failed to load more tags', e)
-  } finally {
-    isLoadingMoreTags.value = false
-  }
-}
+const filteredTagData = computed(() =>
+  sortTagsByCategory(tagData.value, selectedCategoryName.value, false),
+)
 
 /** 其余逻辑保持不变 */
 const iconClass = computed(() => {
@@ -359,14 +300,23 @@ const isImageIcon = (icon) => {
 }
 
 const gotoCategory = (c) => {
-  const value = encodeURIComponent(c.id ?? c.name)
+  const categoryId = c.id ?? c.name
+  selectedCategoryGlobal.value = categoryId
+  selectedTagsGlobal.value = []
+  const value = encodeURIComponent(categoryId)
   navigateTo({ path: '/', query: { category: value } })
   handleItemClick()
 }
 
 const gotoTag = (t) => {
-  const value = encodeURIComponent(t.id ?? t.name)
-  navigateTo({ path: '/', query: { tags: value } })
+  const tagId = t.id ?? t.name
+  selectedTagsGlobal.value = [tagId]
+  const value = encodeURIComponent(tagId)
+  const query = { tags: value }
+  if (selectedCategoryGlobal.value !== '' && selectedCategoryGlobal.value != null) {
+    query.category = encodeURIComponent(String(selectedCategoryGlobal.value))
+  }
+  navigateTo({ path: '/', query })
   handleItemClick()
 }
 </script>

@@ -9,7 +9,12 @@
       <div class="post-options">
         <div class="post-options-left">
           <CategorySelect v-model="selectedCategory" />
-          <TagSelect v-model="selectedTags" creatable />
+          <TagSelect
+            v-model="selectedTags"
+            :category="selectedCategory"
+            creatable
+            require-category
+          />
           <PostTypeSelect v-model="postType" />
           <PostVisibleScopeSelect v-model="postVisibleScope" />
         </div>
@@ -66,7 +71,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, reactive } from 'vue'
+import { computed, onMounted, ref, reactive, watch } from 'vue'
 import CategorySelect from '~/components/CategorySelect.vue'
 import LoginOverlay from '~/components/LoginOverlay.vue'
 import PostEditor from '~/components/PostEditor.vue'
@@ -141,6 +146,16 @@ const loadDraft = async () => {
 }
 
 onMounted(loadDraft)
+
+watch(selectedCategory, (newCategory, oldCategory) => {
+  if (
+    oldCategory !== '' &&
+    String(newCategory ?? '') !== String(oldCategory ?? '') &&
+    selectedTags.value.length
+  ) {
+    selectedTags.value = []
+  }
+})
 
 const clearPost = async () => {
   title.value = ''
