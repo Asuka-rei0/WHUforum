@@ -6,7 +6,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.io.ByteArrayInputStream;
-import java.io.IOException;
 import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
@@ -50,7 +49,7 @@ public class UploadController {
     String url;
     try {
       url = imageUploader.upload(file.getBytes(), file.getOriginalFilename()).join();
-    } catch (IOException e) {
+    } catch (Exception e) {
       return ResponseEntity.internalServerError().body(Map.of("code", 3, "msg", "Upload failed"));
     }
     return ResponseEntity.ok(Map.of("code", 0, "msg", "ok", "data", Map.of("url", url)));
@@ -93,7 +92,13 @@ public class UploadController {
     description = "Presigned URL",
     content = @Content(schema = @Schema(implementation = java.util.Map.class))
   )
-  public java.util.Map<String, String> presign(@RequestParam("filename") String filename) {
-    return imageUploader.presignUpload(filename);
+  public ResponseEntity<?> presign(@RequestParam("filename") String filename) {
+    try {
+      return ResponseEntity.ok(imageUploader.presignUpload(filename));
+    } catch (UnsupportedOperationException e) {
+      return ResponseEntity.status(501).body(Map.of("error", "Presign upload not supported"));
+    } catch (Exception e) {
+      return ResponseEntity.internalServerError().body(Map.of("error", "Presign upload failed"));
+    }
   }
 }

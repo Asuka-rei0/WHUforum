@@ -19,13 +19,16 @@ public class OpenAiService {
   @Value("${openai.model:gpt-4o}")
   private String model;
 
+  @Value("${openai.base-url:https://api.openai.com/v1}")
+  private String baseUrl;
+
   private final RestTemplate restTemplate = new RestTemplate();
 
   public Optional<String> formatMarkdown(String text) {
     if (apiKey == null || apiKey.isBlank()) {
       return Optional.empty();
     }
-    String url = "https://api.openai.com/v1/chat/completions";
+    String url = chatCompletionsUrl();
 
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_JSON);
@@ -61,5 +64,19 @@ public class OpenAiService {
       }
     } catch (Exception ignored) {}
     return Optional.empty();
+  }
+
+  String chatCompletionsUrl() {
+    String normalized = baseUrl == null ? "" : baseUrl.trim();
+    if (normalized.isBlank()) {
+      normalized = "https://api.openai.com/v1";
+    }
+    while (normalized.endsWith("/")) {
+      normalized = normalized.substring(0, normalized.length() - 1);
+    }
+    if (normalized.endsWith("/chat/completions")) {
+      return normalized;
+    }
+    return normalized + "/chat/completions";
   }
 }

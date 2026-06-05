@@ -13,7 +13,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import java.io.IOException;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -95,8 +94,8 @@ public class UserController {
     String url = null;
     try {
       url = imageUploader.upload(file.getBytes(), file.getOriginalFilename()).join();
-    } catch (IOException e) {
-      return ResponseEntity.internalServerError().body(Map.of("url", url));
+    } catch (Exception e) {
+      return ResponseEntity.internalServerError().body(Map.of("error", "Upload failed"));
     }
     userService.updateAvatar(auth.getName(), url);
     return ResponseEntity.ok(Map.of("url", url));

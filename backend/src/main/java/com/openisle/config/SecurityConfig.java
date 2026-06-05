@@ -179,6 +179,8 @@ public class SecurityConfig {
           .permitAll()
           .requestMatchers("/actuator/**")
           .permitAll()
+          .requestMatchers(HttpMethod.GET, "/uploads/**")
+          .permitAll()
           .requestMatchers(HttpMethod.POST, "/api/categories/**")
           .hasAuthority("ADMIN")
           .requestMatchers(HttpMethod.POST, "/api/tags/**")
@@ -233,6 +235,7 @@ public class SecurityConfig {
             uri.startsWith("/api/sitemap.xml") ||
             uri.startsWith("/api/medals") ||
             uri.startsWith("/actuator") ||
+            uri.startsWith("/uploads") ||
             uri.startsWith("/api/rss"));
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {

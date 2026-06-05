@@ -16,14 +16,11 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.concurrent.CustomizableThreadFactory;
-import org.springframework.stereotype.Service;
 
 /**
  * ImageUploader implementation using Tencent Cloud COS.
  */
-@Service
 public class CosImageUploader extends ImageUploader {
 
   private final COSClient cosClient;
@@ -36,14 +33,13 @@ public class CosImageUploader extends ImageUploader {
     new CustomizableThreadFactory("cos-upload-")
   );
 
-  @org.springframework.beans.factory.annotation.Autowired
   public CosImageUploader(
     com.openisle.repository.ImageRepository imageRepository,
-    @Value("${cos.secret-id:}") String secretId,
-    @Value("${cos.secret-key:}") String secretKey,
-    @Value("${cos.region:ap-guangzhou}") String region,
-    @Value("${cos.bucket-name:}") String bucketName,
-    @Value("${cos.base-url:https://example.com}") String baseUrl
+    String secretId,
+    String secretKey,
+    String region,
+    String bucketName,
+    String baseUrl
   ) {
     super(imageRepository, baseUrl);
     COSCredentials cred = new BasicCOSCredentials(secretId, secretKey);

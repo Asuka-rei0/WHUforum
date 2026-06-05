@@ -140,6 +140,28 @@ class UserControllerTest {
   }
 
   @Test
+  void uploadAvatarReturnsServerErrorWhenUploaderFails() throws Exception {
+    MockMultipartFile file = new MockMultipartFile(
+      "file",
+      "a.png",
+      MediaType.IMAGE_PNG_VALUE,
+      "img".getBytes()
+    );
+    Mockito.when(imageUploader.upload(any(), eq("a.png"))).thenReturn(
+      java.util.concurrent.CompletableFuture.failedFuture(new RuntimeException("boom"))
+    );
+
+    mockMvc
+      .perform(
+        multipart("/api/users/me/avatar")
+          .file(file)
+          .principal(new UsernamePasswordAuthenticationToken("alice", "p"))
+      )
+      .andExpect(status().isInternalServerError())
+      .andExpect(jsonPath("$.error").value("Upload failed"));
+  }
+
+  @Test
   void deleteCurrentUserWithPassword() throws Exception {
     mockMvc
       .perform(

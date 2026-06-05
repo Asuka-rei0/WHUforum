@@ -113,18 +113,39 @@ export function createVditor(editorId, options = {}) {
 
         vditor.tip('文件上传中', 0)
         vditor.disabled()
-        const res = await fetch(
-          `${API_BASE_URL}/api/upload/presign?filename=${encodeURIComponent(file.name)}`,
-          { headers: { Authorization: `Bearer ${getToken()}` } },
-        )
-        if (!res.ok) {
-          vditor.enable()
-          vditor.tip('获取上传地址失败')
-          return '获取上传地址失败'
-        }
-        const info = await res.json()
-        const put = await fetch(info.uploadUrl, { method: 'PUT', body: file })
-        if (!put.ok) {
+        let fileUrl = ''
+        try {
+          const token = getToken()
+          const uploadByForm = async () => {
+            const form = new FormData()
+            form.append('file', file)
+            const uploadRes = await fetch(`${API_BASE_URL}/api/upload`, {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+              body: form,
+            })
+            const uploadData = await uploadRes.json().catch(() => null)
+            if (!uploadRes.ok || uploadData?.code !== 0 || !uploadData?.data?.url) {
+              throw new Error('multipart upload failed')
+            }
+            return uploadData.data.url
+          }
+
+          try {
+            const res = await fetch(
+              `${API_BASE_URL}/api/upload/presign?filename=${encodeURIComponent(file.name)}`,
+              { headers: { Authorization: `Bearer ${token}` } },
+            )
+            if (!res.ok) throw new Error('presign failed')
+            const info = await res.json()
+            if (!info?.uploadUrl || !info?.fileUrl) throw new Error('invalid presign response')
+            const put = await fetch(info.uploadUrl, { method: 'PUT', body: file })
+            if (!put.ok) throw new Error('presigned upload failed')
+            fileUrl = info.fileUrl
+          } catch (e) {
+            fileUrl = await uploadByForm()
+          }
+        } catch (e) {
           vditor.enable()
           vditor.tip('上传失败')
           return '上传失败'
@@ -148,13 +169,13 @@ export function createVditor(editorId, options = {}) {
         const audioExts = ['wav', 'mp3', 'ogg']
         let md
         if (imageExts.includes(ext)) {
-          md = `![${file.name}](${info.fileUrl})`
+          md = `![${file.name}](${fileUrl})`
         } else if (audioExts.includes(ext)) {
-          md = `<audio controls="controls" src="${info.fileUrl}"></audio>`
+          md = `<audio controls="controls" src="${fileUrl}"></audio>`
         } else if (videoExts.includes(ext)) {
-          md = `<video width="600" controls>\n  <source src="${info.fileUrl}" type="video/${ext}">\n  你的浏览器不支持 video 标签。\n</video>`
+          md = `<video width="600" controls>\n  <source src="${fileUrl}" type="video/${ext}">\n  你的浏览器不支持 video 标签。\n</video>`
         } else {
-          md = `[${file.name}](${info.fileUrl})`
+          md = `[${file.name}](${fileUrl})`
         }
         vditor.insertValue(md + '\n')
         vditor.enable()
