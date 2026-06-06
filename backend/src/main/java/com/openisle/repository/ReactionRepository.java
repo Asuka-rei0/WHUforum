@@ -5,10 +5,12 @@ import com.openisle.model.Message;
 import com.openisle.model.Post;
 import com.openisle.model.Reaction;
 import com.openisle.model.User;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -31,6 +33,10 @@ public interface ReactionRepository extends JpaRepository<Reaction, Long> {
   List<Reaction> findByPost(Post post);
   List<Reaction> findByComment(Comment comment);
   List<Reaction> findByMessage(Message message);
+
+  @Modifying
+  @Query(value = "DELETE FROM reactions WHERE comment_id IN (:commentIds)", nativeQuery = true)
+  void deleteByComment_IdIn(@Param("commentIds") Collection<Long> commentIds);
 
   @Query(
     "SELECT r.post.id FROM Reaction r WHERE r.post IS NOT NULL AND r.post.author.username = :username AND r.type = com.openisle.model.ReactionType.LIKE GROUP BY r.post.id ORDER BY COUNT(r.id) DESC"

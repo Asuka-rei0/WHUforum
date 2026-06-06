@@ -7,9 +7,11 @@ import com.openisle.model.Post;
 import com.openisle.model.User;
 import com.openisle.repository.AnonymousAuditRepository;
 import java.security.SecureRandom;
+import java.util.Collection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -47,6 +49,24 @@ public class AnonymousAuditService {
       .stream()
       .map(this::toDto)
       .toList();
+  }
+
+  @Transactional
+  public void deleteByPost(Post post) {
+    anonymousAuditRepository.deleteByPost(post);
+  }
+
+  @Transactional
+  public void deleteByComment(Comment comment) {
+    anonymousAuditRepository.deleteByComment(comment);
+  }
+
+  @Transactional
+  public void deleteByCommentIds(Collection<Long> commentIds) {
+    if (commentIds == null || commentIds.isEmpty()) {
+      return;
+    }
+    anonymousAuditRepository.deleteByComment_IdIn(commentIds);
   }
 
   private AnonymousAuditDto toDto(AnonymousAudit audit) {

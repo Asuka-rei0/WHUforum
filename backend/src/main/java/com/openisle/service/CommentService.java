@@ -493,6 +493,7 @@ public class CommentService {
     // 逻辑删除评论
     Post post = comment.getPost();
     Long commentId = comment.getId();
+    anonymousAuditService.deleteByComment(comment);
     commentRepository.delete(comment);
     searchIndexEventPublisher.publishCommentDeleted(commentId);
     // 删除积分历史
@@ -512,6 +513,47 @@ public class CommentService {
     }
 
     log.debug("deleteCommentCascade removed comment {}", comment.getId());
+  }
+
+  @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
+  @Transactional
+  public void deleteAllByPostHard(Post post) {
+    List<Long> commentIds = commentRepository.findAllIdsByPostIdIncludingDeleted(post.getId());
+    if (commentIds.isEmpty()) {
+      return;
+    }
+
+    for (String content : commentRepository.findAllContentsByPostIdIncludingDeleted(post.getId())) {
+      if (content == null) {
+        continue;
+      }
+      imageUploader.removeReferences(imageUploader.extractUrls(content));
+    }
+
+    Set<User> usersToRecalculate = new HashSet<>(
+      pointHistoryRepository.findDistinctUsersByCommentIds(commentIds)
+    );
+    LocalDateTime deletedAt = LocalDateTime.now();
+
+    reactionRepository.deleteByComment_IdIn(commentIds);
+    commentSubscriptionRepository.deleteByComment_IdIn(commentIds);
+    notificationRepository.deleteByComment_IdIn(commentIds);
+    anonymousAuditService.deleteByCommentIds(commentIds);
+    pointHistoryRepository.markDeletedAndDetachComments(commentIds, deletedAt);
+    commentRepository.clearParentReferences(commentIds);
+    commentRepository.hardDeleteByIds(commentIds);
+
+    for (Long commentId : commentIds) {
+      searchIndexEventPublisher.publishCommentDeleted(commentId);
+    }
+
+    if (!usersToRecalculate.isEmpty()) {
+      for (User user : usersToRecalculate) {
+        int newPoints = pointService.recalculateUserPoints(user);
+        user.setPoint(newPoints);
+      }
+      userRepository.saveAll(usersToRecalculate);
+    }
   }
 
   @Transactional

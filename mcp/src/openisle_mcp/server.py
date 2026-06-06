@@ -98,8 +98,8 @@ async def lifespan(_: FastMCP):
 app = FastMCP(
     name="openisle-mcp",
     instructions=(
-        "Use this server to search OpenIsle content, create new posts, reply to posts and "
-        "comments using the Authorization header or configured access token, retrieve details "
+        "Use this server to search OpenIsle content with the Authorization header or configured "
+        "access token, create new posts, reply to posts and comments, retrieve details "
         "for a specific post, list posts created within a recent time window, and review "
         "unread notification messages."
     ),
@@ -111,7 +111,10 @@ app = FastMCP(
 
 @app.tool(
     name="search",
-    description="Perform a global search across OpenIsle resources.",
+    description=(
+        "Perform an authenticated global search across OpenIsle resources using the request "
+        "Authorization header or configured access token."
+    ),
     structured_output=True,
 )
 async def search(
@@ -126,7 +129,9 @@ async def search(
 
     try:
         logger.info("Received search request for keyword='%s'", sanitized)
-        raw_results = await search_client.global_search(sanitized)
+        raw_results = await search_client.global_search(
+            sanitized, token=_extract_authorization_token(ctx)
+        )
     except httpx.HTTPStatusError as exc:  # pragma: no cover - network errors
         message = (
             "OpenIsle backend returned HTTP "
@@ -786,7 +791,10 @@ async def create_post(
 
 @app.tool(
     name="recent_posts",
-    description="Retrieve posts created in the last N minutes.",
+    description=(
+        "Retrieve posts created in the last N minutes using the request Authorization header "
+        "or configured access token."
+    ),
     structured_output=True,
 )
 async def recent_posts(
@@ -800,7 +808,9 @@ async def recent_posts(
 
     try:
         logger.info("Fetching recent posts for last %s minutes", minutes)
-        raw_posts = await search_client.recent_posts(minutes)
+        raw_posts = await search_client.recent_posts(
+            minutes, token=_extract_authorization_token(ctx)
+        )
     except httpx.HTTPStatusError as exc:  # pragma: no cover - network errors
         message = (
             "OpenIsle backend returned HTTP "
@@ -838,7 +848,10 @@ async def recent_posts(
 
 @app.tool(
     name="get_post",
-    description="Retrieve detailed information for a single post.",
+    description=(
+        "Retrieve detailed information for a single post using the request Authorization header "
+        "or configured access token."
+    ),
     structured_output=True,
 )
 async def get_post(

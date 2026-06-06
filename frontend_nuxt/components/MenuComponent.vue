@@ -158,7 +158,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { authState, fetchCurrentUser } from '~/utils/auth'
 import { fetchUnreadCount, notificationState } from '~/utils/notification'
 import { useIsMobile } from '~/utils/screen'
@@ -201,6 +201,7 @@ const {
   data: categoryData,
   pending: isLoadingCategory,
   error: categoryError,
+  refresh: refreshCategoryData,
 } = await useAsyncData(
   // 稳定 key：避免 hydration 期误判
   'menu:categories',
@@ -232,6 +233,7 @@ const {
   data: tagData,
   pending: isLoadingTag,
   error: tagError,
+  refresh: refreshTagData,
 } = await useAsyncData('menu:tags', fetchTags, {
   server: true,
   default: () => [],
@@ -278,8 +280,15 @@ const updateCount = async () => {
   }
 }
 
+const refreshMenuTaxonomy = () => {
+  Promise.all([refreshCategoryData(), refreshTagData()]).catch((e) => {
+    console.error('Failed to refresh menu taxonomy', e)
+  })
+}
+
 onMounted(async () => {
   await Promise.all([updateCount(), loadPoint()])
+  window.addEventListener('refresh-home', refreshMenuTaxonomy)
   // 登录态变化时再拉一次未读数和积分；与 useAsyncData 无关
   watch(
     () => authState.loggedIn,
@@ -288,6 +297,10 @@ onMounted(async () => {
       loadPoint()
     },
   )
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('refresh-home', refreshMenuTaxonomy)
 })
 
 const handleItemClick = () => {

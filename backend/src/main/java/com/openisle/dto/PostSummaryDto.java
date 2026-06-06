@@ -38,5 +38,6 @@ public class PostSummaryDto {
   private PostVisibleScopeType visibleScope;
   private boolean anonymous;
   private String anonymousAlias;
+  private boolean ownedByCurrentUser;
   private FleaMarketItemDto fleaMarketItem;
 }

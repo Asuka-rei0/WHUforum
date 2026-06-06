@@ -99,6 +99,9 @@ class PostServiceTest {
     service.deletePost(1L, "alice");
 
     verify(postReadService).deleteByPost(post);
+    verify(commentService).deleteAllByPostHard(post);
+    verify(pollVoteRepo).deleteByPost_Id(1L);
+    verify(pointHistoryRepository).markDeletedAndDetachPost(eq(1L), any(LocalDateTime.class));
     verify(postRepo).delete(post);
     verify(postChangeLogService).deleteLogsForPost(post);
   }

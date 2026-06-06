@@ -86,15 +86,16 @@ class SearchClient:
             headers["Content-Type"] = "application/json"
         return headers
 
-    async def global_search(self, keyword: str) -> list[dict[str, Any]]:
+    async def global_search(self, keyword: str, token: str | None = None) -> list[dict[str, Any]]:
         """Call the global search endpoint and return the parsed JSON payload."""
 
         client = self._get_client()
+        resolved_token = self._require_token(token)
         logger.debug("Calling global search with keyword=%s", keyword)
         response = await client.get(
             "/api/search/global",
             params={"keyword": keyword},
-            headers=self._build_headers(),
+            headers=self._build_headers(token=resolved_token),
         )
         response.raise_for_status()
         payload = response.json()
@@ -207,10 +208,11 @@ class SearchClient:
         logger.info("Post creation succeeded with id=%s, token=%s", body.get("id"), token)
         return body
 
-    async def recent_posts(self, minutes: int) -> list[dict[str, Any]]:
+    async def recent_posts(self, minutes: int, token: str | None = None) -> list[dict[str, Any]]:
         """Return posts created within the given timeframe."""
 
         client = self._get_client()
+        resolved_token = self._require_token(token)
         logger.debug(
             "Fetching recent posts within last %s minutes",
             minutes,
@@ -218,7 +220,7 @@ class SearchClient:
         response = await client.get(
             "/api/posts/recent",
             params={"minutes": minutes},
-            headers=self._build_headers(),
+            headers=self._build_headers(token=resolved_token),
         )
         response.raise_for_status()
         payload = response.json()
@@ -238,7 +240,8 @@ class SearchClient:
         """Retrieve the detailed payload for a single post."""
 
         client = self._get_client()
-        headers = self._build_headers(token=token)
+        resolved_token = self._require_token(token)
+        headers = self._build_headers(token=resolved_token)
         logger.debug("Fetching post details for post_id=%s", post_id)
         response = await client.get(f"/api/posts/{post_id}", headers=headers)
         response.raise_for_status()

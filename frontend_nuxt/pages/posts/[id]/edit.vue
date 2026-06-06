@@ -54,6 +54,9 @@ import LoginOverlay from '~/components/LoginOverlay.vue'
 import PostVisibleScopeSelect from '~/components/PostVisibleScopeSelect.vue'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
+definePageMeta({
+  middleware: ['auth-required'],
+})
 
 const title = ref('')
 const content = ref('')

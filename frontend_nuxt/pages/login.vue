@@ -65,6 +65,7 @@ import { registerPush } from '~/utils/push'
 
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
+const route = useRoute()
 
 const mode = ref('login')
 const email = ref('')
@@ -82,11 +83,20 @@ const clearErrors = () => {
   passwordError.value = ''
 }
 
+const redirectAfterLogin = () => {
+  const target = Array.isArray(route.query.redirect)
+    ? route.query.redirect[0]
+    : route.query.redirect
+  return typeof target === 'string' && target.startsWith('/') && !target.startsWith('//')
+    ? target
+    : '/'
+}
+
 const completeLogin = async (token) => {
   await setToken(token)
   registerPush()
   toast.success('登录成功')
-  await navigateTo('/', { replace: true })
+  await navigateTo(redirectAfterLogin(), { replace: true })
 }
 
 const submitLogin = async () => {

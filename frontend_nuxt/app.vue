@@ -17,7 +17,7 @@
         :class="{ 'menu-open': menuVisible && !hideMenu && !isFloatMode }"
         :style="isFloatMode ? { paddingTop: '0px', minHeight: '100vh' } : {}"
       >
-        <NuxtPage keepalive />
+        <NuxtPage />
       </div>
 
       <div
@@ -46,8 +46,6 @@ import { checkToken } from '~/utils/auth'
 const isMobile = useIsMobile()
 const menuVisible = ref(!isMobile.value)
 
-await checkToken()
-
 const showNewPostIcon = computed(() => useRoute().path === '/')
 
 const hideMenu = computed(() => {
@@ -62,6 +60,7 @@ const isFloatMode = computed(() => useRoute().query.float !== undefined)
 onMounted(() => {
   if (typeof window !== 'undefined') {
     menuVisible.value = window.innerWidth > 768
+    checkToken()
   }
 })
 
@@ -86,12 +85,11 @@ const goToNewPost = () => {
 /* 页面过渡效果 */
 .page-enter-active,
 .page-leave-active {
-  transition: all 0.4s;
+  transition: opacity 0.16s ease;
 }
 .page-enter-from,
 .page-leave-to {
   opacity: 0;
-  filter: blur(10px);
 }
 
 .header-container {

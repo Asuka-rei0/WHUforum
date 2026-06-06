@@ -71,4 +71,38 @@ class HelloControllerTest {
       .andExpect(status().isUnauthorized())
       .andExpect(jsonPath("$.error").value("Invalid or expired token"));
   }
+
+  @Test
+  void publicPostListEndpointsDoNotRequireTokenInSecurityLayer() throws Exception {
+    mockMvc.perform(get("/api/posts")).andExpect(status().isNotFound());
+    mockMvc.perform(get("/api/posts/latest-reply")).andExpect(status().isNotFound());
+  }
+
+  @Test
+  void postContentEndpointsRequireToken() throws Exception {
+    mockMvc
+      .perform(get("/api/posts/1"))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.error").value("Missing token"));
+    mockMvc
+      .perform(get("/api/posts/1/comments"))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.error").value("Missing token"));
+    mockMvc
+      .perform(get("/api/search/global").param("keyword", "campus"))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.error").value("Missing token"));
+    mockMvc
+      .perform(get("/api/users/alice/posts"))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.error").value("Missing token"));
+    mockMvc
+      .perform(get("/api/rss"))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.error").value("Missing token"));
+    mockMvc
+      .perform(get("/api/sitemap.xml"))
+      .andExpect(status().isUnauthorized())
+      .andExpect(jsonPath("$.error").value("Missing token"));
+  }
 }

@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api")
 @RequiredArgsConstructor
 @Slf4j
+@SecurityRequirement(name = "JWT")
 public class CommentController {
 
   private final CommentService commentService;

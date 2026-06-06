@@ -1339,10 +1339,10 @@ public class PostService {
     if (!user.getId().equals(author.getId()) && user.getRole() != Role.ADMIN) {
       throw new IllegalArgumentException("Unauthorized");
     }
+    anonymousAuditService.deleteByPost(post);
     fleaMarketItemRepository.findByPost(post).ifPresent(fleaMarketItemRepository::delete);
-    for (Comment c : commentRepository.findByPostAndParentIsNullOrderByCreatedAtAsc(post)) {
-      commentService.deleteCommentCascade(c);
-    }
+    commentService.deleteAllByPostHard(post);
+    pollVoteRepository.deleteByPost_Id(post.getId());
     reactionRepository.findByPost(post).forEach(reactionRepository::delete);
     postSubscriptionRepository.findByPost(post).forEach(postSubscriptionRepository::delete);
     notificationRepository.deleteAll(notificationRepository.findByPost(post));
@@ -1353,14 +1353,15 @@ public class PostService {
       .stream()
       .map(PointHistory::getUser)
       .collect(Collectors.toSet());
+    LocalDateTime deletedAt = LocalDateTime.now();
     if (!pointHistories.isEmpty()) {
-      LocalDateTime deletedAt = LocalDateTime.now();
       for (PointHistory history : pointHistories) {
         history.setDeletedAt(deletedAt);
         history.setPost(null);
       }
       pointHistoryRepository.saveAll(pointHistories);
     }
+    pointHistoryRepository.markDeletedAndDetachPost(post.getId(), deletedAt);
     if (!usersToRecalculate.isEmpty()) {
       for (User affected : usersToRecalculate) {
         int newPoints = pointService.recalculateUserPoints(affected);
@@ -1450,13 +1451,7 @@ public class PostService {
     ) {
       throw new IllegalArgumentException("Unauthorized");
     }
-    if (item.getStatus() == FleaMarketStatus.OFF_SHELF && operator.getRole() != Role.ADMIN) {
-      throw new IllegalStateException("Item is already off shelf");
-    }
-    if (item.getStatus() == FleaMarketStatus.AVAILABLE && status == FleaMarketStatus.OFF_SHELF) {
-      item.setBuyer(null);
-    }
-    if (status == FleaMarketStatus.AVAILABLE) {
+    if (status == FleaMarketStatus.AVAILABLE || status == FleaMarketStatus.OFF_SHELF) {
       item.setBuyer(null);
     }
     item.setStatus(status);

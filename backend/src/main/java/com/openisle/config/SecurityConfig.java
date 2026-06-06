@@ -137,23 +137,24 @@ public class SecurityConfig {
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/auth/cas/authorize")
           .permitAll()
-          .requestMatchers(HttpMethod.GET, "/api/posts/**")
-          .permitAll()
-          .requestMatchers(HttpMethod.GET, "/api/comments/**")
-          .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/categories/**")
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/tags/**")
+          .permitAll()
+          .requestMatchers(
+            HttpMethod.GET,
+            "/api/posts",
+            "/api/posts/ranking",
+            "/api/posts/latest-reply",
+            "/api/posts/featured",
+            "/api/posts/recent"
+          )
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/config/**")
           .permitAll()
           .requestMatchers(HttpMethod.POST, "/api/auth/google")
           .permitAll()
           .requestMatchers(HttpMethod.POST, "/api/auth/reason")
-          .permitAll()
-          .requestMatchers(HttpMethod.GET, "/api/search/**")
-          .permitAll()
-          .requestMatchers(HttpMethod.GET, "/api/users/**")
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/medals/**")
           .permitAll()
@@ -163,11 +164,7 @@ public class SecurityConfig {
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/activities/**")
           .permitAll()
-          .requestMatchers(HttpMethod.GET, "/api/sitemap.xml")
-          .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/channels")
-          .permitAll()
-          .requestMatchers(HttpMethod.GET, "/api/rss")
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/online/**")
           .permitAll()
@@ -220,23 +217,22 @@ public class SecurityConfig {
 
         boolean publicGet =
           "GET".equalsIgnoreCase(request.getMethod()) &&
-          (uri.startsWith("/api/posts") ||
-            uri.startsWith("/api/comments") ||
-            uri.startsWith("/api/categories") ||
+          (uri.startsWith("/api/categories") ||
             uri.startsWith("/api/tags") ||
-            uri.startsWith("/api/search") ||
-            uri.startsWith("/api/users") ||
+            uri.equals("/api/posts") ||
+            uri.equals("/api/posts/ranking") ||
+            uri.equals("/api/posts/latest-reply") ||
+            uri.equals("/api/posts/featured") ||
+            uri.equals("/api/posts/recent") ||
             uri.startsWith("/api/reaction-types") ||
             uri.startsWith("/api/config") ||
             uri.startsWith("/api/activities") ||
             uri.startsWith("/api/push/public-key") ||
             uri.startsWith("/api/point-goods") ||
             uri.startsWith("/api/channels") ||
-            uri.startsWith("/api/sitemap.xml") ||
             uri.startsWith("/api/medals") ||
             uri.startsWith("/actuator") ||
-            uri.startsWith("/uploads") ||
-            uri.startsWith("/api/rss"));
+            uri.startsWith("/uploads"));
 
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
           String token = authHeader.substring(7);

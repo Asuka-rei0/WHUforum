@@ -63,9 +63,13 @@ public class PostMapper {
         applyListFields(post, dto);
         List<User> participants = participantsMap.get(post.getId());
         if (participants != null) {
-          dto.setParticipants(
-            participants.stream().map(userMapper::toAuthorDto).collect(Collectors.toList())
-          );
+          if (post.isAnonymous()) {
+            dto.setParticipants(List.of(userMapper.toAnonymousAuthorDto(post.getAnonymousAlias())));
+          } else {
+            dto.setParticipants(
+              participants.stream().map(userMapper::toAuthorDto).collect(Collectors.toList())
+            );
+          }
         } else {
           dto.setParticipants(List.of());
         }
@@ -86,6 +90,7 @@ public class PostMapper {
   public PostDetailDto toDetailDto(Post post, String viewer) {
     PostDetailDto dto = new PostDetailDto();
     applyCommon(post, dto);
+    dto.setOwnedByCurrentUser(isOwnedBy(post, viewer));
     List<CommentDto> comments = commentService
       .getCommentsForPost(post.getId(), CommentSort.OLDEST)
       .stream()
@@ -237,5 +242,11 @@ public class PostMapper {
       dto.setBuyer(userMapper.toAuthorDto(item.getBuyer()));
     }
     return dto;
+  }
+
+  private boolean isOwnedBy(Post post, String viewer) {
+    return (
+      viewer != null && post.getAuthor() != null && viewer.equals(post.getAuthor().getUsername())
+    );
   }
 }

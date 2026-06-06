@@ -245,9 +245,7 @@ const copyInviteLink = async () => {
 }
 
 const copyRssLink = async () => {
-  const rssLink = `${API_BASE_URL}/api/rss`
-  await navigator.clipboard.writeText(rssLink)
-  toast.success('RSS链接已复制')
+  toast.info('RSS 公开订阅已因校园隐私保护暂停')
 }
 
 const goToProfile = async () => {

@@ -6,10 +6,14 @@ import com.openisle.model.NotificationType;
 import com.openisle.model.Post;
 import com.openisle.model.ReactionType;
 import com.openisle.model.User;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 /** Repository for Notification entities. */
 public interface NotificationRepository extends JpaRepository<Notification, Long> {
@@ -40,6 +44,10 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
   );
   List<Notification> findByPost(Post post);
   List<Notification> findByComment(Comment comment);
+
+  @Modifying
+  @Query(value = "DELETE FROM notifications WHERE comment_id IN (:commentIds)", nativeQuery = true)
+  void deleteByComment_IdIn(@Param("commentIds") Collection<Long> commentIds);
 
   void deleteByTypeAndFromUser(NotificationType type, User fromUser);
 

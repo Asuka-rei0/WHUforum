@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/posts/{postId}/donations")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "JWT")
 public class PostDonationController {
 
   private final PointService pointService;
@@ -30,7 +31,6 @@ public class PostDonationController {
   }
 
   @PostMapping
-  @SecurityRequirement(name = "JWT")
   @Operation(summary = "Donate", description = "Donate points to the post author")
   @ApiResponse(responseCode = "200", description = "Donation result")
   public DonationResponse donate(

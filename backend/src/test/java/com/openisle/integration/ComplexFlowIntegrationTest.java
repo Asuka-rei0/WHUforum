@@ -87,6 +87,12 @@ class ComplexFlowIntegrationTest {
     return rest.exchange(url, HttpMethod.POST, new HttpEntity<>(body, h), Map.class);
   }
 
+  private <T> ResponseEntity<T> get(String url, Class<T> type, String token) {
+    HttpHeaders h = new HttpHeaders();
+    if (token != null) h.setBearerAuth(token);
+    return rest.exchange(url, HttpMethod.GET, new HttpEntity<>(h), type);
+  }
+
   @Test
   void nestedCommentsVisibleInPost() {
     String t1 = registerAndLogin("alice1", "alice1@whu.edu.cn");
@@ -130,7 +136,7 @@ class ComplexFlowIntegrationTest {
 
     postJson("/api/comments/" + r1 + "/replies", Map.of("content", "reply2"), t2);
 
-    Map post = rest.getForObject("/api/posts/" + postId, Map.class);
+    Map post = get("/api/posts/" + postId, Map.class, t1).getBody();
     assertEquals("Hello", post.get("title"));
     List<?> comments = (List<?>) post.get("comments");
     assertEquals(1, comments.size());
@@ -199,7 +205,7 @@ class ComplexFlowIntegrationTest {
 
     postJson("/api/comments/" + commentId + "/reactions", Map.of("type", "DISLIKE"), t2);
 
-    Map post = rest.getForObject("/api/posts/" + postId, Map.class);
+    Map post = get("/api/posts/" + postId, Map.class, t1).getBody();
     List<?> reactions = (List<?>) post.get("reactions");
     assertEquals(1, reactions.size());
     assertEquals("LIKE", ((Map<?, ?>) reactions.get(0)).get("type"));

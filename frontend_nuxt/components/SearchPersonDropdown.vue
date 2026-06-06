@@ -74,7 +74,11 @@ const onClose = () => emit('close')
 
 const fetchResults = async (kw) => {
   if (!kw) return []
-  const res = await fetch(`${API_BASE_URL}/api/search/users?keyword=${encodeURIComponent(kw)}`)
+  const token = getToken()
+  if (!token) return []
+  const res = await fetch(`${API_BASE_URL}/api/search/users?keyword=${encodeURIComponent(kw)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
   if (!res.ok) return []
   const data = await res.json()
   results.value = data.map((u) => ({

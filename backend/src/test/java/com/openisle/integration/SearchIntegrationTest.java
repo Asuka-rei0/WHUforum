@@ -84,6 +84,12 @@ class SearchIntegrationTest {
     return rest.exchange(url, HttpMethod.POST, new HttpEntity<>(body, h), Map.class);
   }
 
+  private <T> ResponseEntity<T> get(String url, Class<T> type, String token) {
+    HttpHeaders h = new HttpHeaders();
+    if (token != null) h.setBearerAuth(token);
+    return rest.exchange(url, HttpMethod.GET, new HttpEntity<>(h), type);
+  }
+
   @Test
   void globalSearchReturnsMixedResults() {
     String admin = registerAndLoginAsAdmin("admin1", "admin1@whu.edu.cn");
@@ -121,10 +127,11 @@ class SearchIntegrationTest {
 
     postJson("/api/posts/" + postId + "/comments", Map.of("content", "Nice article"), admin);
 
-    List<Map<String, Object>> results = rest.getForObject(
+    List<Map<String, Object>> results = get(
       "/api/search/global?keyword=nic",
-      List.class
-    );
+      List.class,
+      admin
+    ).getBody();
     assertEquals(5, results.size());
     assertTrue(results.stream().anyMatch(m -> "user".equals(m.get("type"))));
     assertTrue(results.stream().anyMatch(m -> "post".equals(m.get("type"))));

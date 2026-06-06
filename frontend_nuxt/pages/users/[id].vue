@@ -306,6 +306,7 @@ const API_BASE_URL = config.public.apiBaseUrl
 
 definePageMeta({
   alias: ['/users/:id/'],
+  middleware: ['auth-required'],
 })
 const route = useRoute()
 const username = route.params.id
@@ -360,9 +361,7 @@ const levelInfo = computed(() => {
 })
 
 const isMine = computed(function () {
-  const mine = authState.username === username || String(authState.userId) === username
-  console.log(mine)
-  return mine
+  return authState.username === username || String(authState.userId) === username
 })
 
 const formatDate = (d) => {
@@ -370,10 +369,13 @@ const formatDate = (d) => {
   return TimeManager.format(d)
 }
 
-const fetchUser = async () => {
+const authHeaders = () => {
   const token = getToken()
-  const headers = token ? { Authorization: `Bearer ${token}` } : {}
-  const res = await fetch(`${API_BASE_URL}/api/users/${username}`, { headers })
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
+const fetchUser = async () => {
+  const res = await fetch(`${API_BASE_URL}/api/users/${username}`, { headers: authHeaders() })
   if (res.ok) {
     const data = await res.json()
     user.value = data
@@ -384,7 +386,8 @@ const fetchUser = async () => {
 }
 
 const fetchSummary = async () => {
-  const postsRes = await fetch(`${API_BASE_URL}/api/users/${username}/hot-posts`)
+  const headers = authHeaders()
+  const postsRes = await fetch(`${API_BASE_URL}/api/users/${username}/hot-posts`, { headers })
   if (postsRes.ok) {
     const data = await postsRes.json()
     hotPosts.value = data.map((p) => ({
@@ -395,13 +398,13 @@ const fetchSummary = async () => {
     }))
   }
 
-  const repliesRes = await fetch(`${API_BASE_URL}/api/users/${username}/hot-replies`)
+  const repliesRes = await fetch(`${API_BASE_URL}/api/users/${username}/hot-replies`, { headers })
   if (repliesRes.ok) {
     const data = await repliesRes.json()
     hotReplies.value = data.map((c) => ({ icon: 'comment-icon', comment: c }))
   }
 
-  const tagsRes = await fetch(`${API_BASE_URL}/api/users/${username}/hot-tags`)
+  const tagsRes = await fetch(`${API_BASE_URL}/api/users/${username}/hot-tags`, { headers })
   if (tagsRes.ok) {
     const data = await tagsRes.json()
     hotTags.value = data.map((t) => ({
@@ -465,10 +468,11 @@ const combineDiscussionItems = (items) => {
 }
 
 const fetchTimeline = async () => {
+  const headers = authHeaders()
   const [postsRes, repliesRes, tagsRes] = await Promise.all([
-    fetch(`${API_BASE_URL}/api/users/${username}/posts?limit=50`),
-    fetch(`${API_BASE_URL}/api/users/${username}/replies?limit=50`),
-    fetch(`${API_BASE_URL}/api/users/${username}/tags?limit=50`),
+    fetch(`${API_BASE_URL}/api/users/${username}/posts?limit=50`, { headers }),
+    fetch(`${API_BASE_URL}/api/users/${username}/replies?limit=50`, { headers }),
+    fetch(`${API_BASE_URL}/api/users/${username}/tags?limit=50`, { headers }),
   ])
   const posts = postsRes.ok ? await postsRes.json() : []
   const replies = repliesRes.ok ? await repliesRes.json() : []
@@ -519,16 +523,19 @@ const fetchReadHistory = async () => {
 }
 
 const fetchFollowUsers = async () => {
+  const headers = authHeaders()
   const [followerRes, followingRes] = await Promise.all([
-    fetch(`${API_BASE_URL}/api/users/${username}/followers`),
-    fetch(`${API_BASE_URL}/api/users/${username}/following`),
+    fetch(`${API_BASE_URL}/api/users/${username}/followers`, { headers }),
+    fetch(`${API_BASE_URL}/api/users/${username}/following`, { headers }),
   ])
   followers.value = followerRes.ok ? await followerRes.json() : []
   followings.value = followingRes.ok ? await followingRes.json() : []
 }
 
 const fetchFavorites = async () => {
-  const res = await fetch(`${API_BASE_URL}/api/users/${username}/subscribed-posts`)
+  const res = await fetch(`${API_BASE_URL}/api/users/${username}/subscribed-posts`, {
+    headers: authHeaders(),
+  })
   if (res.ok) {
     const data = await res.json()
     favoritePosts.value = data.map((p) => ({ icon: 'bookmark', post: p }))
@@ -919,8 +926,8 @@ watch(isMine, (val) => {
   display: flex;
   flex-direction: column;
   padding: 20px;
-  row-gap: 40px;     /* 行间距 */
-  column-gap: 20px;  /* 列间距 */
+  row-gap: 40px; /* 行间距 */
+  column-gap: 20px; /* 列间距 */
 }
 
 .summary-title {
@@ -961,8 +968,8 @@ watch(isMine, (val) => {
 .summary-divider {
   display: flex;
   flex-direction: row;
-  row-gap: 40px;     /* 行间距 */
-  column-gap: 20px;  /* 列间距 */
+  row-gap: 40px; /* 行间距 */
+  column-gap: 20px; /* 列间距 */
   width: 100%;
   flex-wrap: wrap;
 }

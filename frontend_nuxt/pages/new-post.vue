@@ -8,7 +8,7 @@
       </div>
       <div class="post-options">
         <div class="post-options-left">
-          <CategorySelect v-model="selectedCategory" />
+          <CategorySelect v-model="selectedCategory" :options="categoryOptions" />
           <TagSelect
             v-model="selectedTags"
             :category="selectedCategory"
@@ -46,11 +46,11 @@
           <input v-model="anonymous" type="checkbox" />
           <span>匿名发布</span>
         </label>
-        <label class="campus-option-item">
+        <label v-if="isFleaMarketCategory" class="campus-option-item">
           <input v-model="fleaMarket" type="checkbox" />
           <span>跳蚤市场物品</span>
         </label>
-        <div v-if="fleaMarket" class="flea-fields">
+        <div v-if="isFleaMarketCategory && fleaMarket" class="flea-fields">
           <input
             v-model="fleaPrice"
             class="flea-input"
@@ -83,14 +83,19 @@ import ProposalForm from '~/components/ProposalForm.vue'
 import { toast } from '~/main'
 import { getApiErrorMessage } from '~/utils/apiError'
 import { authState, getToken } from '~/utils/auth'
+import { filterCampusTaxonomy, resolveCategoryName } from '~/utils/campusTaxonomy'
 import PostVisibleScopeSelect from '~/components/PostVisibleScopeSelect.vue'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
+definePageMeta({
+  middleware: ['auth-required'],
+})
 
 const title = ref('')
 const content = ref('')
 const selectedCategory = ref('')
 const selectedTags = ref([])
+const categoryOptions = ref([])
 const postType = ref('NORMAL')
 const postVisibleScope = ref('ALL')
 const lottery = reactive({
@@ -122,6 +127,25 @@ const startTime = ref(null)
 const isWaitingPosting = ref(false)
 const isAiLoading = ref(false)
 const isLogin = computed(() => authState.loggedIn)
+const isFleaMarketCategory = computed(
+  () => resolveCategoryName(selectedCategory.value, categoryOptions.value) === '跳蚤市场',
+)
+
+const resetFleaMarketFields = () => {
+  fleaMarket.value = false
+  fleaPrice.value = ''
+  fleaTradeLocation.value = ''
+  fleaContact.value = ''
+}
+
+const loadCategoryOptions = async () => {
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/categories`)
+    if (res.ok) {
+      categoryOptions.value = filterCampusTaxonomy(await res.json())
+    }
+  } catch {}
+}
 
 const loadDraft = async () => {
   const token = getToken()
@@ -145,7 +169,10 @@ const loadDraft = async () => {
   }
 }
 
-onMounted(loadDraft)
+onMounted(() => {
+  loadCategoryOptions()
+  loadDraft()
+})
 
 watch(selectedCategory, (newCategory, oldCategory) => {
   if (
@@ -154,6 +181,9 @@ watch(selectedCategory, (newCategory, oldCategory) => {
     selectedTags.value.length
   ) {
     selectedTags.value = []
+  }
+  if (!isFleaMarketCategory.value) {
+    resetFleaMarketFields()
   }
 })
 
@@ -180,10 +210,7 @@ const clearPost = async () => {
   proposal.proposedName = ''
   proposal.proposalDescription = ''
   anonymous.value = false
-  fleaMarket.value = false
-  fleaPrice.value = ''
-  fleaTradeLocation.value = ''
-  fleaContact.value = ''
+  resetFleaMarketFields()
 
   // 删除草稿
   const token = getToken()
@@ -351,7 +378,8 @@ const submitPost = async () => {
       return
     }
   }
-  if (fleaMarket.value) {
+  const shouldCreateFleaMarketItem = isFleaMarketCategory.value && fleaMarket.value
+  if (shouldCreateFleaMarketItem) {
     if (fleaPrice.value !== '' && Number(fleaPrice.value) < 0) {
       toast.error('价格不能小于 0')
       return
@@ -398,10 +426,11 @@ const submitPost = async () => {
       type: postType.value,
       postVisibleScopeType: postVisibleScope.value,
       anonymous: anonymous.value,
-      fleaMarket: fleaMarket.value,
-      fleaPrice: fleaMarket.value && fleaPrice.value !== '' ? Number(fleaPrice.value) : undefined,
-      fleaTradeLocation: fleaMarket.value ? fleaTradeLocation.value : undefined,
-      fleaContact: fleaMarket.value ? fleaContact.value : undefined,
+      fleaMarket: shouldCreateFleaMarketItem,
+      fleaPrice:
+        shouldCreateFleaMarketItem && fleaPrice.value !== '' ? Number(fleaPrice.value) : undefined,
+      fleaTradeLocation: shouldCreateFleaMarketItem ? fleaTradeLocation.value : undefined,
+      fleaContact: shouldCreateFleaMarketItem ? fleaContact.value : undefined,
     }
 
     if (postType.value === 'LOTTERY') {

@@ -139,7 +139,10 @@ const normalizeSummary = (data) => ({
 
 const loadDonations = async () => {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/posts/${props.postId}/donations`)
+    const token = getToken()
+    const res = await fetch(`${API_BASE_URL}/api/posts/${props.postId}/donations`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    })
     if (!res.ok) return
     const data = await res.json()
     donationSummary.value = normalizeSummary(data)

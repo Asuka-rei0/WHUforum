@@ -27,87 +27,112 @@
           selectedTopic === '精选'
         "
       >
-        <div class="article-header-container">
-          <div class="header-item main-item">
-            <div class="header-item-text">话题</div>
-          </div>
-          <div class="header-item avatars">
-            <div class="header-item-text">参与人员</div>
-          </div>
-          <div class="header-item comments">
-            <div class="header-item-text">回复</div>
-          </div>
-          <div class="header-item views">
-            <div class="header-item-text">浏览</div>
-          </div>
-          <div class="header-item activity">
-            <div class="header-item-text">活动</div>
-          </div>
-        </div>
-
-        <div v-if="pendingFirst" class="loading-container">
-          <l-hatch size="28" stroke="4" speed="3.5" color="var(--primary-color)"></l-hatch>
-        </div>
-
-        <div v-else-if="articles.length === 0">
-          <div class="no-posts-container">
-            <div class="no-posts-text">暂时没有帖子 :( 点击发帖发送第一篇相关帖子吧!</div>
-          </div>
-        </div>
-
-        <div
-          v-if="!pendingFirst"
-          class="article-item"
-          v-for="article in articles"
-          :key="article.id"
-          @click="navigateTo(`/posts/${article.id}`)"
-        >
-          <div class="article-main-container">
-            <NuxtLink class="article-item-title main-item">
-              <pin v-if="article.pinned" theme="outline" class="pinned-icon" />
-              <gift v-if="article.type === 'LOTTERY'" class="lottery-icon" />
-              <ranking-list v-else-if="article.type === 'POLL'" class="poll-icon" />
-              <hands v-else-if="article.type === 'PROPOSAL'" class="proposal-icon" />
-              <star v-if="!article.rssExcluded" class="featured-icon" />
-              <span v-if="article.anonymous" class="article-badge anonymous">匿名</span>
-              <span v-if="article.fleaMarketItem" class="article-badge flea">
-                {{ fleaStatusText(article.fleaMarketItem.status) }}
-              </span>
-              {{ article.title }}
-              <lock class="preview-close-icon" v-if="article.isRestricted" />
-            </NuxtLink>
-            <NuxtLink class="article-item-description main-item" :to="`/posts/${article.id}`">
-              <div v-html="stripMarkdownWithTiebaMoji(article.description, 500)"></div>
-            </NuxtLink>
-            <div class="article-info-container main-item">
-              <ArticleCategory :category="article.category" />
-              <ArticleTags :tags="article.tags" />
+        <div class="article-list-shell" :class="{ masked: shouldMaskArticles }">
+          <div class="article-list-content" :class="{ blurred: shouldMaskArticles }">
+            <div class="article-header-container">
+              <div class="header-item main-item">
+                <div class="header-item-text">话题</div>
+              </div>
+              <div class="header-item avatars">
+                <div class="header-item-text">参与人员</div>
+              </div>
+              <div class="header-item comments">
+                <div class="header-item-text">回复</div>
+              </div>
+              <div class="header-item views">
+                <div class="header-item-text">浏览</div>
+              </div>
+              <div class="header-item activity">
+                <div class="header-item-text">活动</div>
+              </div>
             </div>
-          </div>
 
-          <div class="article-member-avatars-container">
-            <div v-for="member in article.members" class="article-member-avatar-item">
-              <BaseUserAvatar
-                class="article-member-avatar-item-img"
-                :src="member.avatar"
-                :user-id="member.id"
-                alt="avatar"
-                :disable-link="true"
-                :width="25"
-              />
+            <div v-if="pendingFirst" class="loading-container">
+              <l-hatch size="28" stroke="4" speed="3.5" color="var(--primary-color)"></l-hatch>
             </div>
-          </div>
 
-          <div class="article-comments main-info-text">
-            {{ article.comments }}
-          </div>
+            <div v-else-if="articles.length === 0">
+              <div class="no-posts-container">
+                <div class="no-posts-text">暂时没有帖子 :( 点击发帖发送第一篇相关帖子吧!</div>
+              </div>
+            </div>
 
-          <div class="article-views main-info-text">
-            {{ article.views }}
-          </div>
+            <div
+              v-if="!pendingFirst"
+              class="article-item"
+              v-for="article in articles"
+              :key="article.id"
+              @click="navigateTo(`/posts/${article.id}`)"
+            >
+              <div class="article-main-container">
+                <NuxtLink class="article-item-title main-item">
+                  <pin v-if="article.pinned" theme="outline" class="pinned-icon" />
+                  <gift v-if="article.type === 'LOTTERY'" class="lottery-icon" />
+                  <ranking-list v-else-if="article.type === 'POLL'" class="poll-icon" />
+                  <hands v-else-if="article.type === 'PROPOSAL'" class="proposal-icon" />
+                  <star v-if="!article.rssExcluded" class="featured-icon" />
+                  <span v-if="article.anonymous" class="article-badge anonymous">匿名</span>
+                  <span v-if="article.fleaMarketItem" class="article-badge flea">
+                    {{ fleaStatusText(article.fleaMarketItem.status) }}
+                  </span>
+                  {{ article.title }}
+                  <lock class="preview-close-icon" v-if="article.isRestricted" />
+                </NuxtLink>
+                <NuxtLink class="article-item-description main-item" :to="`/posts/${article.id}`">
+                  <div
+                    class="article-description-content"
+                    v-html="stripMarkdownWithTiebaMoji(article.description, 500)"
+                  ></div>
+                </NuxtLink>
+                <div class="article-info-container main-item">
+                  <ArticleCategory :category="article.category" />
+                  <ArticleTags :tags="article.tags" />
+                </div>
+              </div>
 
-          <div class="article-time main-info-text">
-            {{ article.time }}
+              <div class="article-member-avatars-container">
+                <div v-for="member in article.members" class="article-member-avatar-item">
+                  <BaseUserAvatar
+                    class="article-member-avatar-item-img"
+                    :src="member.avatar"
+                    :user-id="member.id"
+                    alt="avatar"
+                    :disable-link="true"
+                    :width="25"
+                  />
+                </div>
+              </div>
+
+              <div class="article-comments main-info-text">
+                {{ article.comments }}
+              </div>
+
+              <div class="article-views main-info-text">
+                {{ article.views }}
+              </div>
+
+              <div class="article-time main-info-text">
+                {{ article.time }}
+              </div>
+            </div>
+
+            <!-- 通用“底部加载更多”组件（自管 loading/observer/并发） -->
+            <InfiniteLoadMore
+              v-if="articles.length > 0"
+              :key="ioKey"
+              :on-load="fetchNextPage"
+              :pause="pendingFirst"
+              root-margin="200px 0px"
+            />
+          </div>
+          <div v-if="shouldMaskArticles" class="article-login-overlay" @click.stop>
+            <div class="article-login-overlay-content">
+              <user-icon class="article-login-overlay-icon" />
+              <span class="article-login-overlay-text">请先登录，点击跳转到登录页面</span>
+              <button class="article-login-overlay-button" type="button" @click.stop="goLogin">
+                登录
+              </button>
+            </div>
           </div>
         </div>
       </template>
@@ -116,15 +141,6 @@
         热门帖子功能开发中，敬请期待。
       </div>
       <div v-else class="placeholder-container">分类浏览功能开发中，敬请期待。</div>
-
-      <!-- 通用“底部加载更多”组件（自管 loading/observer/并发） -->
-      <InfiniteLoadMore
-        v-if="articles.length > 0"
-        :key="ioKey"
-        :on-load="fetchNextPage"
-        :pause="pendingFirst"
-        root-margin="200px 0px"
-      />
     </div>
   </div>
 </template>
@@ -138,7 +154,7 @@ import CategorySelect from '~/components/CategorySelect.vue'
 import SearchDropdown from '~/components/SearchDropdown.vue'
 import TagSelect from '~/components/TagSelect.vue'
 import InfiniteLoadMore from '~/components/InfiniteLoadMore.vue'
-import { getToken } from '~/utils/auth'
+import { authState, getToken } from '~/utils/auth'
 import { stripMarkdown } from '~/utils/markdown'
 import { useIsMobile } from '~/utils/screen'
 import BaseUserAvatar from '~/components/BaseUserAvatar.vue'
@@ -192,6 +208,7 @@ const articles = ref([])
 const page = ref(0)
 const pageSize = 10
 const isMobile = useIsMobile()
+const loggedIn = computed(() => authState.loggedIn)
 
 /** URL 参数 -> 本地筛选值 **/
 const selectedCategorySet = (category) => {
@@ -356,6 +373,9 @@ const tokenHeader = computed(() => {
   const token = getToken()
   return token ? { Authorization: `Bearer ${token}` } : {}
 })
+const goLogin = () => {
+  navigateTo({ path: '/login', query: { redirect: route.fullPath } })
+}
 
 /** —— 首屏数据托管（SSR） —— **/
 const asyncKey = computed(() => [
@@ -371,33 +391,43 @@ const {
 } = await useAsyncData(
   () => asyncKey.value.join('::'),
   async () => {
-    const res = await $fetch(buildUrl({ pageNo: 0 }), { headers: tokenHeader.value })
-    const data = Array.isArray(res) ? res : []
-    return data.map((p) => ({
-      id: p.id,
-      title: p.title,
-      description: p.content,
-      category: p.category,
-      tags: p.tags || [],
-      members: (p.participants || []).map((m) => ({ id: m.id, avatar: m.avatar })),
-      comments: p.commentCount,
-      views: p.views,
-      rssExcluded: p.rssExcluded || false,
-      isRestricted: p.visibleScope === 'ONLY_ME' || p.visibleScope === 'ONLY_REGISTER',
-      time: TimeManager.format(
-        selectedTopic.value === '最新回复' ? p.lastReplyAt || p.createdAt : p.createdAt,
-      ),
-      pinned: Boolean(p.pinned ?? p.pinnedAt ?? p.pinned_at),
-      type: p.type,
-      anonymous: p.anonymous,
-      fleaMarketItem: p.fleaMarketItem || null,
-    }))
+    try {
+      const res = await $fetch(buildUrl({ pageNo: 0 }), { headers: tokenHeader.value })
+      const data = Array.isArray(res) ? res : []
+      return data.map((p) => ({
+        id: p.id,
+        title: p.title,
+        description: p.content,
+        category: p.category,
+        tags: p.tags || [],
+        members: (p.participants || []).map((m) => ({ id: m.id, avatar: m.avatar })),
+        comments: p.commentCount,
+        views: p.views,
+        rssExcluded: p.rssExcluded || false,
+        isRestricted: p.visibleScope === 'ONLY_ME' || p.visibleScope === 'ONLY_REGISTER',
+        time: TimeManager.format(
+          selectedTopic.value === '最新回复' ? p.lastReplyAt || p.createdAt : p.createdAt,
+        ),
+        pinned: Boolean(p.pinned ?? p.pinnedAt ?? p.pinned_at),
+        type: p.type,
+        anonymous: p.anonymous,
+        fleaMarketItem: p.fleaMarketItem || null,
+      }))
+    } catch (err) {
+      if (import.meta.client && (err?.statusCode === 401 || err?.response?.status === 401)) {
+        await navigateTo({ path: '/login', query: { redirect: route.fullPath } }, { replace: true })
+      }
+      return []
+    }
   },
   {
-    server: true,
+    server: false,
     default: () => [],
     watch: [selectedTopic, baseQuery],
   },
+)
+const shouldMaskArticles = computed(
+  () => !loggedIn.value && !pendingFirst.value && articles.value.length > 0,
 )
 
 /** 首屏/筛选变更：重置分页并灌入 firstPage（InfiniteLoadMore 会凭 key 重建状态） **/
@@ -416,8 +446,16 @@ const fetchNextPage = async () => {
   if (pendingFirst.value) return false
 
   const nextPage = page.value + 1
-  const res = await $fetch(buildUrl({ pageNo: nextPage }), { headers: tokenHeader.value })
-  const data = Array.isArray(res) ? res : []
+  let data = []
+  try {
+    const res = await $fetch(buildUrl({ pageNo: nextPage }), { headers: tokenHeader.value })
+    data = Array.isArray(res) ? res : []
+  } catch (err) {
+    if (err?.statusCode === 401 || err?.response?.status === 401) {
+      await navigateTo({ path: '/login', query: { redirect: route.fullPath } }, { replace: true })
+    }
+    return true
+  }
   const mapped = data.map((p) => ({
     id: p.id,
     title: p.title,
@@ -578,6 +616,74 @@ watch([selectedCategory, selectedTags], ([newCategory, newTags]) => {
   padding-bottom: 100px;
 }
 
+.article-list-shell {
+  position: relative;
+  width: 100%;
+}
+
+.article-list-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+  transition:
+    filter 0.2s ease,
+    opacity 0.2s ease;
+}
+
+.article-list-content.blurred {
+  filter: blur(10px);
+  opacity: 0.58;
+  pointer-events: none;
+  user-select: none;
+}
+
+.article-login-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 280px;
+  padding-top: 96px;
+  background-color: var(--background-color-blur);
+  backdrop-filter: var(--blur-4);
+  -webkit-backdrop-filter: var(--blur-4);
+}
+
+.article-login-overlay-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--text-color);
+  font-size: 20px;
+  line-height: 1.4;
+  text-align: center;
+  flex-wrap: wrap;
+}
+
+.article-login-overlay-icon {
+  flex: 0 0 auto;
+  font-size: 24px;
+}
+
+.article-login-overlay-button {
+  border: none;
+  border-radius: 5px;
+  padding: 7px 18px;
+  background-color: var(--primary-color);
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.article-login-overlay-button:hover {
+  background-color: var(--primary-color-hover);
+}
+
 .article-header-container {
   display: flex;
   flex-direction: row;
@@ -701,6 +807,7 @@ watch([selectedCategory, selectedTags], ([newCategory, newTags]) => {
 }
 
 .article-item-description {
+  position: relative;
   max-width: 100%;
   margin-top: 5px;
   font-size: 13px;
@@ -845,6 +952,16 @@ watch([selectedCategory, selectedTags], ([newCategory, newTags]) => {
 
   .article-header-container {
     display: none;
+  }
+
+  .article-login-overlay {
+    min-height: 220px;
+    padding: 56px 16px 0;
+  }
+
+  .article-login-overlay-content {
+    gap: 10px;
+    font-size: 16px;
   }
 
   .article-member-avatar-item:nth-child(n + 2) {

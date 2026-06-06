@@ -78,9 +78,9 @@
           <div v-if="isMobile" class="info-content-header">
             <div class="user-name">
               {{ author.username }}
-              <medal-one class="medal-icon" />
+              <medal-one v-if="!author.anonymous" class="medal-icon" />
               <NuxtLink
-                v-if="author.displayMedal"
+                v-if="!author.anonymous && author.displayMedal"
                 class="user-medal"
                 :to="`/users/${author.id}?tab=achievements`"
                 >{{ getMedalTitle(author.displayMedal) }}</NuxtLink
@@ -94,9 +94,9 @@
           <div v-if="!isMobile" class="info-content-header">
             <div class="user-name">
               {{ author.username }}
-              <medal-one class="medal-icon" />
+              <medal-one v-if="!author.anonymous" class="medal-icon" />
               <NuxtLink
-                v-if="author.displayMedal"
+                v-if="!author.anonymous && author.displayMedal"
                 class="user-medal"
                 :to="`/users/${author.id}?tab=achievements`"
                 >{{ getMedalTitle(author.displayMedal) }}</NuxtLink
@@ -247,16 +247,7 @@
 </template>
 
 <script setup>
-import {
-  ref,
-  computed,
-  onMounted,
-  onBeforeUnmount,
-  nextTick,
-  watch,
-  watchEffect,
-  onActivated,
-} from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, nextTick, watch, watchEffect } from 'vue'
 import VueEasyLightbox from 'vue-easy-lightbox'
 import { useRoute } from 'vue-router'
 import CommentItem from '~/components/CommentItem.vue'
@@ -287,6 +278,9 @@ const { confirm } = useConfirm()
 
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
+definePageMeta({
+  middleware: ['auth-required'],
+})
 
 const route = useRoute()
 const postId = route.params.id
@@ -323,11 +317,13 @@ const closed = ref(false)
 const pinnedAt = ref(null)
 const rssExcluded = ref(false)
 const isWaitingPostingComment = ref(false)
+const isDeletingPost = ref(false)
 const postTime = ref('')
 const postItems = ref([])
 const mainContainer = ref(null)
 const currentIndex = ref(1)
 const subscribed = ref(false)
+const postOwnedByCurrentUser = ref(false)
 const commentSort = ref('NEWEST')
 const isFetchingComments = ref(false)
 const commentPage = ref(0)
@@ -362,7 +358,14 @@ const lightboxIndex = ref(0)
 const lightboxImgs = ref([])
 const loggedIn = computed(() => authState.loggedIn)
 const isAdmin = computed(() => authState.role === 'ADMIN')
-const isAuthor = computed(() => authState.username === author.value.username)
+const isAuthor = computed(() => {
+  if (postOwnedByCurrentUser.value) return true
+  if (author.value?.anonymous) return false
+  return (
+    authState.username === author.value.username ||
+    (authState.userId && author.value?.id && Number(authState.userId) === Number(author.value.id))
+  )
+})
 const lottery = ref(null)
 const poll = ref(null)
 const fleaMarketItem = ref(null)
@@ -594,17 +597,23 @@ const tokenHeader = computed(() => {
 const {
   data: postData,
   pending: pendingPost,
-  error: postError,
   refresh: refreshPost,
 } = await useAsyncData(
   `post-${postId}`,
   async () => {
     try {
       return await $fetch(`${API_BASE_URL}/api/posts/${postId}`, { headers: tokenHeader.value })
-    } catch (err) {}
+    } catch (err) {
+      if (import.meta.client && (err?.statusCode === 401 || err?.response?.status === 401)) {
+        await navigateTo({ path: '/login', query: { redirect: route.fullPath } }, { replace: true })
+      } else if (import.meta.client && (err?.statusCode === 404 || err?.response?.status === 404)) {
+        await navigateTo('/404', { replace: true })
+      }
+      return null
+    }
   },
   {
-    server: true,
+    server: false,
     lazy: false,
   },
 )
@@ -624,6 +633,7 @@ watchEffect(() => {
   visibleScope.value = data.visibleScope || 'ALL'
   postReactions.value = data.reactions || []
   subscribed.value = !!data.subscribed
+  postOwnedByCurrentUser.value = !!data.ownedByCurrentUser
   status.value = data.status
   closed.value = data.closed
   pinnedAt.value = data.pinnedAt
@@ -692,7 +702,6 @@ const postComment = async (parentUserName, text, clear) => {
     toast.error('帖子已关闭')
     return
   }
-  console.debug('Posting comment', { postId, text })
   isWaitingPostingComment.value = true
   const token = getToken()
   if (!token) {
@@ -706,10 +715,8 @@ const postComment = async (parentUserName, text, clear) => {
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
       body: JSON.stringify({ content: text }),
     })
-    console.debug('Post comment response status', res.status)
     if (res.ok) {
       const data = await res.json()
-      console.debug('Post comment response data', data)
       await fetchTimeline()
       clear()
       if (data.reward && data.reward > 0) {
@@ -723,7 +730,6 @@ const postComment = async (parentUserName, text, clear) => {
       toast.error('评论失败，请稍后再试')
     }
   } catch (e) {
-    console.debug('Post comment error', e)
     toast.error('评论失败，请稍后再试')
   } finally {
     isWaitingPostingComment.value = false
@@ -875,6 +881,7 @@ const editPost = () => {
 }
 
 const deletePost = async () => {
+  if (isDeletingPost.value) return
   try {
     const ok = await confirm('删除帖子', '此操作不可恢复，确认要删除吗？')
     if (!ok) return
@@ -883,18 +890,23 @@ const deletePost = async () => {
       toast.error('请先登录')
       return
     }
+    isDeletingPost.value = true
     const res = await fetch(`${API_BASE_URL}/api/posts/${postId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${token}` },
     })
     if (res.ok) {
       toast.success('已删除')
-      navigateTo('/', { replace: true })
+      clearNuxtData((key) => key.startsWith('home:firstpage::'))
+      await navigateTo('/', { replace: true })
+      window.dispatchEvent(new Event('refresh-home'))
     } else {
       toast.error('操作失败')
     }
   } catch (e) {
     toast.error('操作失败')
+  } finally {
+    isDeletingPost.value = false
   }
 }
 
@@ -988,12 +1000,6 @@ const fetchCommentsAndChangeLog = async ({ pageNo = 0, append = false } = {}) =>
   } else {
     isLoadingMoreComments.value = true
   }
-  console.info('Fetching comments and chang log', {
-    postId,
-    sort: commentSort.value,
-    page: pageNo,
-    pageSize: commentPageSize,
-  })
   let done = false
   try {
     const token = getToken()
@@ -1002,12 +1008,10 @@ const fetchCommentsAndChangeLog = async ({ pageNo = 0, append = false } = {}) =>
     url.searchParams.set('page', String(pageNo))
     url.searchParams.set('pageSize', String(commentPageSize))
     const res = await fetch(url.toString(), {
-      headers: { Authorization: token ? `Bearer ${token}` : '' },
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
-    console.info('Fetch comments response status', res.status)
     if (res.ok) {
       const data = await res.json()
-      console.info('Fetched comments data', data)
 
       const commentList = []
       const changeLogList = []
@@ -1043,9 +1047,12 @@ const fetchCommentsAndChangeLog = async ({ pageNo = 0, append = false } = {}) =>
       await nextTick()
       gatherPostItems()
       return done
+    } else if (res.status === 401) {
+      await navigateTo({ path: '/login', query: { redirect: route.fullPath } }, { replace: true })
+      hasMoreComments.value = false
+      return true
     }
   } catch (e) {
-    console.debug('Fetch comments error', e)
     hasMoreComments.value = false
     return true
   } finally {
@@ -1099,7 +1106,7 @@ const jumpToHashComment = async () => {
 }
 
 const gotoProfile = () => {
-  if (!author.value?.id) return
+  if (!author.value?.id || author.value?.anonymous) return
   navigateTo(`/users/${author.value.id}`, { replace: true })
 }
 
@@ -1110,13 +1117,10 @@ const initPage = async () => {
   const id = hash.startsWith('#comment-') ? hash.substring('#comment-'.length) : null
   if (id) expandCommentPath(id)
   updateCurrentIndex()
-  window.addEventListener('scroll', updateCurrentIndex)
+  window.removeEventListener('scroll', updateCurrentIndex)
+  window.addEventListener('scroll', updateCurrentIndex, { passive: true })
   jumpToHashComment()
 }
-
-onActivated(async () => {
-  await initPage()
-})
 
 onMounted(async () => {
   await initPage()

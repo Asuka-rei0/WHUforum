@@ -118,7 +118,7 @@ class PublishModeIntegrationTest {
     );
     Long postId = ((Number) postResp.getBody().get("id")).longValue();
 
-    List<?> list = rest.getForObject("/api/posts", List.class);
+    List<?> list = get("/api/posts", List.class, userToken).getBody();
     assertTrue(list.isEmpty(), "Post should not be listed before approval");
 
     List<Map<String, Object>> pending = get(
@@ -131,7 +131,7 @@ class PublishModeIntegrationTest {
 
     postJson("/api/admin/posts/" + postId + "/approve", Map.of(), adminToken);
 
-    List<?> listAfter = rest.getForObject("/api/posts", List.class);
+    List<?> listAfter = get("/api/posts", List.class, userToken).getBody();
     assertEquals(1, listAfter.size(), "Post should appear after approval");
   }
 }

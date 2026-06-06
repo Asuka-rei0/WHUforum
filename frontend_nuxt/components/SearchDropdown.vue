@@ -53,6 +53,7 @@ import { onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import Dropdown from '~/components/Dropdown.vue'
 import { stripMarkdown } from '~/utils/markdown'
 import { useIsMobile } from '~/utils/screen'
+import { getToken } from '~/utils/auth'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
 
@@ -112,7 +113,11 @@ const onClose = () => emit('close')
 
 const fetchResults = async (kw) => {
   if (!kw) return []
-  const res = await fetch(`${API_BASE_URL}/api/search/global?keyword=${encodeURIComponent(kw)}`)
+  const token = getToken()
+  if (!token) return []
+  const res = await fetch(`${API_BASE_URL}/api/search/global?keyword=${encodeURIComponent(kw)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
   if (!res.ok) return []
   const data = await res.json()
   results.value = data.map((r) => ({

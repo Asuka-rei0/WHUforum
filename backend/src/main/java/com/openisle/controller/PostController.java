@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.*;
 @RestController
 @RequestMapping("/api/posts")
 @RequiredArgsConstructor
+@SecurityRequirement(name = "JWT")
 public class PostController {
 
   private final PostService postService;

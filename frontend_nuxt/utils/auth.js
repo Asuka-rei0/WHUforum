@@ -61,10 +61,12 @@ export async function fetchCurrentUser() {
     const res = await fetch(`${API_BASE_URL}/api/users/me`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-    if (!res.ok) return null
+    if (!res.ok) {
+      return res.status === 401 || res.status === 403 ? null : undefined
+    }
     return await res.json()
   } catch (e) {
-    return null
+    return undefined
   }
 }
 
@@ -72,10 +74,14 @@ export async function loadCurrentUser() {
   const user = await fetchCurrentUser()
   if (user) {
     setUserInfo(user)
-  } else {
+    authState.loggedIn = true
+  } else if (user === null) {
     clearUserInfo()
+    authState.loggedIn = false
+  } else {
+    authState.loggedIn = !!getToken()
   }
-  authState.loggedIn = user !== null
+  return user
 }
 
 export function isLogin() {
@@ -92,11 +98,17 @@ export async function checkToken() {
       headers: { Authorization: `Bearer ${token}` },
     })
     if (res.ok) {
-      await setToken(token)
-    } else {
+      await loadCurrentUser()
+      return true
+    } else if (res.status === 401 || res.status === 403) {
       clearToken()
+      return false
+    } else {
+      authState.loggedIn = true
+      return true
     }
   } catch (e) {
-    clearToken()
+    authState.loggedIn = true
+    return true
   }
 }
