@@ -1,6 +1,7 @@
 package com.openisle.service;
 
 import com.openisle.config.CachingConfig;
+import com.openisle.event.TreeholeReviewRequestedEvent;
 import com.openisle.exception.EmailSendException;
 import com.openisle.exception.NotFoundException;
 import com.openisle.exception.RateLimitException;
@@ -358,6 +359,9 @@ public class PostService {
     ModerationService.ModerationResult moderation = moderationService.inspect(
       title + "\n" + content
     );
+    if (treeholePost && moderation.flagged() && !moderation.crisis()) {
+      throw new IllegalArgumentException("Post contains sensitive content");
+    }
     boolean needsReview = publishMode == PublishMode.REVIEW || moderation.flagged();
     if (treeholePost) {
       initializeTreeholeState(post, treeholeExpectedVisibility);
@@ -392,6 +396,9 @@ public class PostService {
         post.getAnonymousAlias(),
         treeholePost ? "treehole post" : "anonymous post"
       );
+    }
+    if (treeholePost) {
+      publishTreeholeReviewRequested(post, moderation);
     }
     if (Boolean.TRUE.equals(fleaMarket)) {
       FleaMarketItem item = new FleaMarketItem();
@@ -1603,6 +1610,23 @@ public class PostService {
       (
         post.getTreeholeReviewStatus() == TreeholeReviewStatus.AI_REVIEWING ||
         post.getTreeholeReviewStatus() == TreeholeReviewStatus.PRIVATE
+      )
+    );
+  }
+
+  private void publishTreeholeReviewRequested(
+    Post post,
+    ModerationService.ModerationResult moderation
+  ) {
+    applicationContext.publishEvent(
+      new TreeholeReviewRequestedEvent(
+        post.getId(),
+        post.getAuthor() != null ? post.getAuthor().getId() : null,
+        post.getTreeholeExpectedVisibility(),
+        post.getTreeholeReviewStatus(),
+        moderation.flagged(),
+        moderation.crisis(),
+        moderation.matchedWord()
       )
     );
   }
