@@ -78,6 +78,19 @@ public class Post {
   @Column(name = "treehole_review_status", length = 32)
   private TreeholeReviewStatus treeholeReviewStatus;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "treehole_risk_level", length = 8)
+  private TreeholeRiskLevel treeholeRiskLevel;
+
+  @Column(name = "treehole_risk_reason", length = 1000)
+  private String treeholeRiskReason;
+
+  @Column(name = "treehole_recommended_action", length = 1000)
+  private String treeholeRecommendedAction;
+
+  @Column(name = "treehole_reviewed_at")
+  private LocalDateTime treeholeReviewedAt;
+
   @Column(nullable = false)
   private boolean closed = false;
 

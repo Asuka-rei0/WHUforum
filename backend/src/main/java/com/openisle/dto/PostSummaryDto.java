@@ -4,6 +4,7 @@ import com.openisle.model.PostStatus;
 import com.openisle.model.PostType;
 import com.openisle.model.PostVisibleScopeType;
 import com.openisle.model.TreeholeExpectedVisibility;
+import com.openisle.model.TreeholeRiskLevel;
 import com.openisle.model.TreeholeReviewStatus;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -40,6 +41,10 @@ public class PostSummaryDto {
   private PostVisibleScopeType visibleScope;
   private TreeholeExpectedVisibility treeholeExpectedVisibility;
   private TreeholeReviewStatus treeholeReviewStatus;
+  private TreeholeRiskLevel treeholeRiskLevel;
+  private String treeholeRiskReason;
+  private String treeholeRecommendedAction;
+  private LocalDateTime treeholeReviewedAt;
   private boolean anonymous;
   private String anonymousAlias;
   private boolean ownedByCurrentUser;

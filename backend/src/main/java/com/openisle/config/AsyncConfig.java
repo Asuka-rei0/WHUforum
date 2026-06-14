@@ -20,4 +20,15 @@ public class AsyncConfig {
     executor.initialize();
     return executor;
   }
+
+  @Bean(name = "treeholeReviewExecutor")
+  public Executor treeholeReviewExecutor() {
+    ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+    executor.setCorePoolSize(1);
+    executor.setMaxPoolSize(4);
+    executor.setQueueCapacity(200);
+    executor.setThreadNamePrefix("treehole-review-");
+    executor.initialize();
+    return executor;
+  }
 }
