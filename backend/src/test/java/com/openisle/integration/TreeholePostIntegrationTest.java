@@ -5,8 +5,13 @@ import static org.mockito.Mockito.*;
 
 import com.openisle.config.CachingConfig;
 import com.openisle.event.TreeholeReviewRequestedEvent;
+import com.openisle.model.Post;
+import com.openisle.model.PostStatus;
+import com.openisle.model.PostVisibleScopeType;
 import com.openisle.model.Role;
+import com.openisle.model.TreeholeReviewStatus;
 import com.openisle.model.User;
+import com.openisle.repository.PostRepository;
 import com.openisle.repository.UserRepository;
 import com.openisle.service.EmailSender;
 import com.openisle.service.TreeholeReviewService;
@@ -36,6 +41,7 @@ import org.springframework.http.*;
     "management.health.redis.enabled=false",
     "app.moderation.blocked-words=hardblock",
     "app.moderation.crisis-words=crisisword",
+    "app.treehole.ai-review.enabled=false",
   }
 )
 class TreeholePostIntegrationTest {
@@ -45,6 +51,9 @@ class TreeholePostIntegrationTest {
 
   @Autowired
   private UserRepository users;
+
+  @Autowired
+  private PostRepository posts;
 
   @Autowired
   private RedisTemplate<String, Object> redisTemplate;
@@ -130,6 +139,12 @@ class TreeholePostIntegrationTest {
     return rest.exchange(url, HttpMethod.GET, new HttpEntity<>(h), type);
   }
 
+  private ResponseEntity<List> getList(String url, String token) {
+    HttpHeaders h = new HttpHeaders();
+    if (token != null) h.setBearerAuth(token);
+    return rest.exchange(url, HttpMethod.GET, new HttpEntity<>(h), List.class);
+  }
+
   private PostTarget createPostTarget(String adminToken, String suffix) {
     ResponseEntity<Map> catResp = postJson(
       "/api/categories",
@@ -145,6 +160,52 @@ class TreeholePostIntegrationTest {
     );
     Long tagId = ((Number) tagResp.getBody().get("id")).longValue();
     return new PostTarget(catId, tagId);
+  }
+
+  private Long createTreehole(String authorToken, PostTarget target, String suffix, String visibility) {
+    ResponseEntity<Map> postResp = postJson(
+      "/api/posts",
+      Map.of(
+        "title",
+        "Treehole " + suffix,
+        "content",
+        "Content " + suffix,
+        "categoryId",
+        target.categoryId(),
+        "tagIds",
+        List.of(target.tagId()),
+        "type",
+        "TREEHOLE",
+        "treeholeExpectedVisibility",
+        visibility
+      ),
+      authorToken
+    );
+    assertEquals(HttpStatus.OK, postResp.getStatusCode());
+    return ((Number) postResp.getBody().get("id")).longValue();
+  }
+
+  private void markTreeholePublic(Long postId) {
+    Post post = posts.findById(postId).orElseThrow();
+    post.setTreeholeReviewStatus(TreeholeReviewStatus.PUBLIC);
+    post.setStatus(PostStatus.PUBLISHED);
+    post.setVisibleScope(PostVisibleScopeType.ALL);
+    posts.save(post);
+  }
+
+  private void markTreeholeStatus(Long postId, TreeholeReviewStatus reviewStatus) {
+    Post post = posts.findById(postId).orElseThrow();
+    post.setTreeholeReviewStatus(reviewStatus);
+    post.setStatus(PostStatus.PENDING);
+    post.setVisibleScope(PostVisibleScopeType.ONLY_ME);
+    posts.save(post);
+  }
+
+  private boolean containsPostId(List body, Long postId) {
+    return body.stream().anyMatch(item -> {
+      Map post = (Map) item;
+      return ((Number) post.get("id")).longValue() == postId.longValue();
+    });
   }
 
   @Test
@@ -320,6 +381,77 @@ class TreeholePostIntegrationTest {
         "crisisword".equals(event.matchedWord())
       )
     );
+  }
+
+  @Test
+  void treeholeSquareAnonymousOnlySeesPublishedPublicTreeholes() {
+    String adminToken = registerAndLoginAsAdmin("th_admin6", "th_admin6@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author6", "th_author6@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "squareanon");
+
+    Long publicId = createTreehole(authorToken, target, "published", "PUBLIC");
+    markTreeholePublic(publicId);
+    clearPostLimit("th_author6");
+    Long reviewingId = createTreehole(authorToken, target, "reviewing", "PUBLIC");
+
+    ResponseEntity<List> squareResp = getList("/api/treeholes/square?page=0&pageSize=20", null);
+
+    assertEquals(HttpStatus.OK, squareResp.getStatusCode());
+    assertTrue(containsPostId(squareResp.getBody(), publicId));
+    assertFalse(containsPostId(squareResp.getBody(), reviewingId));
+  }
+
+  @Test
+  void treeholeSquareAuthorSeesOwnReviewingPublicTreehole() {
+    String adminToken = registerAndLoginAsAdmin("th_admin7", "th_admin7@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author7", "th_author7@whu.edu.cn");
+    String otherToken = registerAndLogin("th_other7", "th_other7@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "squareauthor");
+
+    Long reviewingId = createTreehole(authorToken, target, "own-reviewing", "PUBLIC");
+
+    ResponseEntity<List> authorSquare = getList(
+      "/api/treeholes/square?page=0&pageSize=20",
+      authorToken
+    );
+    ResponseEntity<List> otherSquare = getList(
+      "/api/treeholes/square?page=0&pageSize=20",
+      otherToken
+    );
+
+    assertEquals(HttpStatus.OK, authorSquare.getStatusCode());
+    assertTrue(containsPostId(authorSquare.getBody(), reviewingId));
+    assertEquals(HttpStatus.OK, otherSquare.getStatusCode());
+    assertFalse(containsPostId(otherSquare.getBody(), reviewingId));
+  }
+
+  @Test
+  void myTreeholesListsAllOwnTreeholeReviewStates() {
+    String adminToken = registerAndLoginAsAdmin("th_admin8", "th_admin8@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author8", "th_author8@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "mine");
+
+    Long reviewingId = createTreehole(authorToken, target, "mine-reviewing", "PUBLIC");
+    clearPostLimit("th_author8");
+    Long privateId = createTreehole(authorToken, target, "mine-private", "ONLY_ME");
+    clearPostLimit("th_author8");
+    Long publicId = createTreehole(authorToken, target, "mine-public", "PUBLIC");
+    markTreeholePublic(publicId);
+    clearPostLimit("th_author8");
+    Long restrictedId = createTreehole(authorToken, target, "mine-restricted", "PUBLIC");
+    markTreeholeStatus(restrictedId, TreeholeReviewStatus.PUBLIC_RESTRICTED);
+    clearPostLimit("th_author8");
+    Long reportedId = createTreehole(authorToken, target, "mine-reported", "PUBLIC");
+    markTreeholeStatus(reportedId, TreeholeReviewStatus.REPORTED);
+
+    ResponseEntity<List> mineResp = getList("/api/treeholes/me?page=0&pageSize=20", authorToken);
+
+    assertEquals(HttpStatus.OK, mineResp.getStatusCode());
+    assertTrue(containsPostId(mineResp.getBody(), reviewingId));
+    assertTrue(containsPostId(mineResp.getBody(), privateId));
+    assertTrue(containsPostId(mineResp.getBody(), publicId));
+    assertTrue(containsPostId(mineResp.getBody(), restrictedId));
+    assertTrue(containsPostId(mineResp.getBody(), reportedId));
   }
 
   @Test
