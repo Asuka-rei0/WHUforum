@@ -147,7 +147,8 @@ public class SecurityConfig {
             "/api/posts/ranking",
             "/api/posts/latest-reply",
             "/api/posts/featured",
-            "/api/posts/recent"
+            "/api/posts/recent",
+            "/api/treeholes/square"
           )
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/config/**")
@@ -224,6 +225,7 @@ public class SecurityConfig {
             uri.equals("/api/posts/latest-reply") ||
             uri.equals("/api/posts/featured") ||
             uri.equals("/api/posts/recent") ||
+            uri.equals("/api/treeholes/square") ||
             uri.startsWith("/api/reaction-types") ||
             uri.startsWith("/api/config") ||
             uri.startsWith("/api/activities") ||

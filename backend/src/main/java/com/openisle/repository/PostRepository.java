@@ -3,7 +3,10 @@ package com.openisle.repository;
 import com.openisle.model.Category;
 import com.openisle.model.Post;
 import com.openisle.model.PostStatus;
+import com.openisle.model.PostType;
+import com.openisle.model.PostVisibleScopeType;
 import com.openisle.model.Tag;
+import com.openisle.model.TreeholeReviewStatus;
 import com.openisle.model.User;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,6 +31,18 @@ public interface PostRepository extends JpaRepository<Post, Long> {
   List<Post> findByAuthorAndStatusOrderByCreatedAtDesc(
     User author,
     PostStatus status,
+    Pageable pageable
+  );
+  List<Post> findByAuthorAndTypeOrderByCreatedAtDesc(
+    User author,
+    PostType type,
+    Pageable pageable
+  );
+  List<Post> findByTypeAndTreeholeReviewStatusAndStatusAndVisibleScopeOrderByCreatedAtDesc(
+    PostType type,
+    TreeholeReviewStatus treeholeReviewStatus,
+    PostStatus status,
+    PostVisibleScopeType visibleScope,
     Pageable pageable
   );
   List<Post> findByCategoryInAndStatus(List<Category> categories, PostStatus status);
@@ -332,4 +347,18 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     PostStatus status,
     Pageable pageable
   );
+
+  @Query(
+    "SELECT p FROM Post p WHERE p.type = com.openisle.model.PostType.TREEHOLE AND (" +
+    "(p.treeholeReviewStatus = com.openisle.model.TreeholeReviewStatus.PUBLIC " +
+    "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
+    "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL) OR " +
+    "(p.author = :author " +
+    "AND p.treeholeExpectedVisibility = com.openisle.model.TreeholeExpectedVisibility.PUBLIC " +
+    "AND p.treeholeReviewStatus = com.openisle.model.TreeholeReviewStatus.AI_REVIEWING " +
+    "AND p.status = com.openisle.model.PostStatus.PENDING " +
+    "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ONLY_ME)) " +
+    "ORDER BY p.createdAt DESC"
+  )
+  List<Post> findTreeholeSquareForAuthor(@Param("author") User author, Pageable pageable);
 }

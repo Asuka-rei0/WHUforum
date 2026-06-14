@@ -1131,6 +1131,34 @@ public class PostService {
     return listPostsByCategories(ids, page, pageSize).stream().collect(Collectors.toList());
   }
 
+  public List<Post> listTreeholeSquare(String username, Integer page, Integer pageSize) {
+    Pageable pageable = buildPageable(page, pageSize);
+    if (StringUtils.isBlank(username)) {
+      return postRepository.findByTypeAndTreeholeReviewStatusAndStatusAndVisibleScopeOrderByCreatedAtDesc(
+        PostType.TREEHOLE,
+        TreeholeReviewStatus.PUBLIC,
+        PostStatus.PUBLISHED,
+        PostVisibleScopeType.ALL,
+        pageable
+      );
+    }
+    User author = userRepository
+      .findByUsername(username)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+    return postRepository.findTreeholeSquareForAuthor(author, pageable);
+  }
+
+  public List<Post> listMyTreeholes(String username, Integer page, Integer pageSize) {
+    User author = userRepository
+      .findByUsername(username)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+    return postRepository.findByAuthorAndTypeOrderByCreatedAtDesc(
+      author,
+      PostType.TREEHOLE,
+      buildPageable(page, pageSize)
+    );
+  }
+
   public List<Post> listPendingPosts() {
     return postRepository
       .findByStatus(PostStatus.PENDING)

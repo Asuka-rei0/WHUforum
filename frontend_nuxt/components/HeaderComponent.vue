@@ -254,6 +254,9 @@ const goToProfile = async () => {
     navigateTo(`/users/${id}`, { replace: true })
   }
 }
+const goToMyTreeholes = () => {
+  navigateTo('/treehole/mine', { replace: true })
+}
 const goToSignup = () => {
   navigateTo('/signup', { replace: true })
 }
@@ -277,6 +280,7 @@ const goToMessages = () => {
 const headerMenuItems = computed(() => [
   { text: '设置', onClick: goToSettings },
   { text: '个人主页', onClick: goToProfile },
+  { text: '我的树洞', onClick: goToMyTreeholes },
   { text: '退出', onClick: goToLogout },
 ])
 

@@ -19,6 +19,15 @@
           <NuxtLink
             class="menu-item"
             exact-active-class="selected"
+            to="/treehole"
+            @click="handleItemClick"
+          >
+            <message-one class="menu-item-icon" />
+            <span class="menu-item-text">匿名树洞</span>
+          </NuxtLink>
+          <NuxtLink
+            class="menu-item"
+            exact-active-class="selected"
             to="/message"
             @click="handleItemClick"
           >
