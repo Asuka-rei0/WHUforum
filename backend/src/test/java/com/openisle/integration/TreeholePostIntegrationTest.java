@@ -194,7 +194,7 @@ class TreeholePostIntegrationTest {
 
     ResponseEntity<Map> otherDetail = get("/api/posts/" + postId, Map.class, otherToken);
     assertEquals(HttpStatus.NOT_FOUND, otherDetail.getStatusCode());
-    verify(treeholeReviewService).handleTreeholeReviewRequested(
+    verify(treeholeReviewService, timeout(1000)).handleTreeholeReviewRequested(
       argThat(event ->
         event.postId().equals(postId) &&
         event.expectedVisibility().name().equals("PUBLIC") &&
@@ -238,7 +238,7 @@ class TreeholePostIntegrationTest {
     assertEquals("PENDING", body.get("status"));
     assertEquals("ONLY_ME", body.get("visibleScope"));
     Long postId = ((Number) body.get("id")).longValue();
-    verify(treeholeReviewService).handleTreeholeReviewRequested(
+    verify(treeholeReviewService, timeout(1000)).handleTreeholeReviewRequested(
       argThat(event ->
         event.postId().equals(postId) &&
         event.expectedVisibility().name().equals("ONLY_ME") &&
@@ -312,7 +312,7 @@ class TreeholePostIntegrationTest {
     assertEquals("AI_REVIEWING", body.get("treeholeReviewStatus"));
     assertEquals("PENDING", body.get("status"));
     assertEquals("ONLY_ME", body.get("visibleScope"));
-    verify(treeholeReviewService).handleTreeholeReviewRequested(
+    verify(treeholeReviewService, timeout(1000)).handleTreeholeReviewRequested(
       argThat(event ->
         event.postId().equals(postId) &&
         event.moderationFlagged() &&
