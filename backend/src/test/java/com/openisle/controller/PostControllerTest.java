@@ -145,6 +145,7 @@ class PostControllerTest {
         isNull(),
         isNull(),
         isNull(),
+        isNull(),
         isNull()
       )
     ).thenReturn(post);
@@ -291,6 +292,7 @@ class PostControllerTest {
       .andExpect(status().isBadRequest());
 
     verify(postService, never()).createPost(
+      any(),
       any(),
       any(),
       any(),

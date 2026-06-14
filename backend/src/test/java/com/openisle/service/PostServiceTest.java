@@ -293,6 +293,7 @@ class PostServiceTest {
         null,
         null,
         null,
+        null,
         null
       )
     );

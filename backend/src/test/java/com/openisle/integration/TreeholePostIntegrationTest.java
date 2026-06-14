@@ -8,7 +8,6 @@ import com.openisle.model.Role;
 import com.openisle.model.User;
 import com.openisle.repository.UserRepository;
 import com.openisle.service.EmailSender;
-import com.openisle.service.PushNotificationService;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -25,17 +24,16 @@ import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.http.*;
 
-/** Integration tests for review publish mode. */
 @SpringBootTest(
   webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
   properties = {
-    "app.post.publish-mode=REVIEW",
+    "app.post.publish-mode=DIRECT",
     "app.register.mode=DIRECT",
     "app.whu.mode=false",
     "management.health.redis.enabled=false",
   }
 )
-class PublishModeIntegrationTest {
+class TreeholePostIntegrationTest {
 
   @Autowired
   private TestRestTemplate rest;
@@ -89,7 +87,7 @@ class PublishModeIntegrationTest {
       u.setVerified(true);
       users.save(u);
     }
-    redisTemplate.delete(CachingConfig.LIMIT_CACHE_NAME + ":posts:" + username);
+    clearPostLimit(username);
     ResponseEntity<Map> resp = rest.postForEntity(
       "/api/auth/login",
       new HttpEntity<>(Map.of("email", email, "password", "pass123"), h),
@@ -106,6 +104,10 @@ class PublishModeIntegrationTest {
     return token;
   }
 
+  private void clearPostLimit(String username) {
+    redisTemplate.delete(CachingConfig.LIMIT_CACHE_NAME + ":posts:" + username);
+  }
+
   private ResponseEntity<Map> postJson(String url, Map<?, ?> body, String token) {
     HttpHeaders h = new HttpHeaders();
     h.setContentType(MediaType.APPLICATION_JSON);
@@ -119,94 +121,138 @@ class PublishModeIntegrationTest {
     return rest.exchange(url, HttpMethod.GET, new HttpEntity<>(h), type);
   }
 
-  @Test
-  void postRequiresApproval() {
-    String userToken = registerAndLogin("eve123", "eve123@whu.edu.cn");
-    String adminToken = registerAndLoginAsAdmin("admin1", "admin1@whu.edu.cn");
-
+  private PostTarget createPostTarget(String adminToken, String suffix) {
     ResponseEntity<Map> catResp = postJson(
       "/api/categories",
-      Map.of("name", "review", "description", "d", "icon", "i"),
+      Map.of("name", "treeholecat" + suffix, "description", "d", "icon", "i"),
       adminToken
     );
     Long catId = ((Number) catResp.getBody().get("id")).longValue();
 
     ResponseEntity<Map> tagResp = postJson(
       "/api/tags",
-      Map.of("name", "t1", "description", "d", "icon", "i"),
+      Map.of("name", "treeholetag" + suffix, "description", "d", "icon", "i"),
       adminToken
     );
     Long tagId = ((Number) tagResp.getBody().get("id")).longValue();
+    return new PostTarget(catId, tagId);
+  }
+
+  @Test
+  void publicTreeholeStartsAiReviewingAndIsAuthorOnly() {
+    String adminToken = registerAndLoginAsAdmin("th_admin1", "th_admin1@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author1", "th_author1@whu.edu.cn");
+    String otherToken = registerAndLogin("th_other1", "th_other1@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "public");
 
     ResponseEntity<Map> postResp = postJson(
       "/api/posts",
-      Map.of("title", "Need", "content", "Review", "categoryId", catId, "tagIds", List.of(tagId)),
-      userToken
-    );
-    Long postId = ((Number) postResp.getBody().get("id")).longValue();
-
-    List<?> list = get("/api/posts", List.class, userToken).getBody();
-    assertTrue(list.isEmpty(), "Post should not be listed before approval");
-
-    List<Map<String, Object>> pending = get(
-      "/api/admin/posts/pending",
-      List.class,
-      adminToken
-    ).getBody();
-    assertEquals(1, pending.size());
-    assertEquals(postId.intValue(), ((Number) pending.get(0).get("id")).intValue());
-
-    redisTemplate.delete(CachingConfig.LIMIT_CACHE_NAME + ":posts:eve123");
-    ResponseEntity<Map> publicTreeholeResp = postJson(
-      "/api/posts",
       Map.of(
         "title",
-        "Public treehole",
+        "Treehole public",
         "content",
-        "Review",
+        "Content",
         "categoryId",
-        catId,
+        target.categoryId(),
         "tagIds",
-        List.of(tagId),
+        List.of(target.tagId()),
         "type",
         "TREEHOLE",
         "treeholeExpectedVisibility",
-        "PUBLIC"
+        "PUBLIC",
+        "anonymous",
+        false,
+        "postVisibleScopeType",
+        "ALL"
       ),
-      userToken
+      authorToken
     );
-    assertEquals("AI_REVIEWING", publicTreeholeResp.getBody().get("treeholeReviewStatus"));
 
-    redisTemplate.delete(CachingConfig.LIMIT_CACHE_NAME + ":posts:eve123");
-    ResponseEntity<Map> privateTreeholeResp = postJson(
+    assertEquals(HttpStatus.OK, postResp.getStatusCode());
+    Map body = postResp.getBody();
+    Long postId = ((Number) body.get("id")).longValue();
+    assertEquals("TREEHOLE", body.get("type"));
+    assertEquals(true, body.get("anonymous"));
+    assertNotNull(body.get("anonymousAlias"));
+    assertEquals("PUBLIC", body.get("treeholeExpectedVisibility"));
+    assertEquals("AI_REVIEWING", body.get("treeholeReviewStatus"));
+    assertEquals("PENDING", body.get("status"));
+    assertEquals("ONLY_ME", body.get("visibleScope"));
+
+    ResponseEntity<Map> authorDetail = get("/api/posts/" + postId, Map.class, authorToken);
+    assertEquals(HttpStatus.OK, authorDetail.getStatusCode());
+    assertEquals("AI_REVIEWING", authorDetail.getBody().get("treeholeReviewStatus"));
+
+    ResponseEntity<Map> otherDetail = get("/api/posts/" + postId, Map.class, otherToken);
+    assertEquals(HttpStatus.NOT_FOUND, otherDetail.getStatusCode());
+  }
+
+  @Test
+  void privateTreeholeDefaultsToOnlyMe() {
+    String adminToken = registerAndLoginAsAdmin("th_admin2", "th_admin2@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author2", "th_author2@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "private");
+
+    ResponseEntity<Map> postResp = postJson(
       "/api/posts",
       Map.of(
         "title",
-        "Private treehole",
+        "Treehole private",
         "content",
-        "Review",
+        "Content",
         "categoryId",
-        catId,
+        target.categoryId(),
         "tagIds",
-        List.of(tagId),
+        List.of(target.tagId()),
         "type",
         "TREEHOLE"
       ),
-      userToken
+      authorToken
     );
-    assertEquals("PRIVATE", privateTreeholeResp.getBody().get("treeholeReviewStatus"));
 
-    List<Map<String, Object>> pendingAfterTreeholes = get(
-      "/api/admin/posts/pending",
-      List.class,
-      adminToken
-    ).getBody();
-    assertEquals(1, pendingAfterTreeholes.size());
-    assertEquals(postId.intValue(), ((Number) pendingAfterTreeholes.get(0).get("id")).intValue());
-
-    postJson("/api/admin/posts/" + postId + "/approve", Map.of(), adminToken);
-
-    List<?> listAfter = get("/api/posts", List.class, userToken).getBody();
-    assertEquals(1, listAfter.size(), "Post should appear after approval");
+    assertEquals(HttpStatus.OK, postResp.getStatusCode());
+    Map body = postResp.getBody();
+    assertEquals("TREEHOLE", body.get("type"));
+    assertEquals(true, body.get("anonymous"));
+    assertNotNull(body.get("anonymousAlias"));
+    assertEquals("ONLY_ME", body.get("treeholeExpectedVisibility"));
+    assertEquals("PRIVATE", body.get("treeholeReviewStatus"));
+    assertEquals("PENDING", body.get("status"));
+    assertEquals("ONLY_ME", body.get("visibleScope"));
   }
+
+  @Test
+  void normalPostKeepsExistingDirectFlow() {
+    String adminToken = registerAndLoginAsAdmin("th_admin3", "th_admin3@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author3", "th_author3@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "normal");
+
+    ResponseEntity<Map> postResp = postJson(
+      "/api/posts",
+      Map.of(
+        "title",
+        "Normal post",
+        "content",
+        "Content",
+        "categoryId",
+        target.categoryId(),
+        "tagIds",
+        List.of(target.tagId()),
+        "anonymous",
+        false
+      ),
+      authorToken
+    );
+
+    assertEquals(HttpStatus.OK, postResp.getStatusCode());
+    Map body = postResp.getBody();
+    assertEquals("NORMAL", body.get("type"));
+    assertEquals(false, body.get("anonymous"));
+    assertNull(body.get("treeholeExpectedVisibility"));
+    assertNull(body.get("treeholeReviewStatus"));
+    assertEquals("PUBLISHED", body.get("status"));
+    assertEquals("ALL", body.get("visibleScope"));
+  }
+
+  private record PostTarget(Long categoryId, Long tagId) {}
 }
