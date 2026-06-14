@@ -80,3 +80,12 @@ out/
 # Docker/local service state
 docker/data/
 docker/volumes/
+docker/docker-compose.local.yaml
+
+# Local notes and generated documentation
+CLAUDE.md
+extract_docs.py
+requirements.txt
+requirements_full.txt
+software_docs/
+项目完成情况分析.md
