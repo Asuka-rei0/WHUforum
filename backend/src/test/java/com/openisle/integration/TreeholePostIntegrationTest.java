@@ -4,10 +4,12 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import com.openisle.config.CachingConfig;
+import com.openisle.event.TreeholeReviewRequestedEvent;
 import com.openisle.model.Role;
 import com.openisle.model.User;
 import com.openisle.repository.UserRepository;
 import com.openisle.service.EmailSender;
+import com.openisle.service.TreeholeReviewService;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,6 +20,7 @@ import org.springframework.cache.concurrent.ConcurrentMapCache;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
@@ -31,6 +34,8 @@ import org.springframework.http.*;
     "app.register.mode=DIRECT",
     "app.whu.mode=false",
     "management.health.redis.enabled=false",
+    "app.moderation.blocked-words=hardblock",
+    "app.moderation.crisis-words=crisisword",
   }
 )
 class TreeholePostIntegrationTest {
@@ -56,10 +61,14 @@ class TreeholePostIntegrationTest {
   @MockBean
   private EmailSender emailService;
 
+  @SpyBean
+  private TreeholeReviewService treeholeReviewService;
+
   @BeforeEach
   void setUpCacheManager() {
     when(cacheManager.getCache(anyString()))
       .thenAnswer(invocation -> new ConcurrentMapCache(invocation.getArgument(0)));
+    clearInvocations(treeholeReviewService);
   }
 
   private String registerAndLogin(String username, String email) {
@@ -185,6 +194,15 @@ class TreeholePostIntegrationTest {
 
     ResponseEntity<Map> otherDetail = get("/api/posts/" + postId, Map.class, otherToken);
     assertEquals(HttpStatus.NOT_FOUND, otherDetail.getStatusCode());
+    verify(treeholeReviewService).handleTreeholeReviewRequested(
+      argThat(event ->
+        event.postId().equals(postId) &&
+        event.expectedVisibility().name().equals("PUBLIC") &&
+        event.initialReviewStatus().name().equals("AI_REVIEWING") &&
+        !event.moderationFlagged() &&
+        !event.crisisFlagged()
+      )
+    );
   }
 
   @Test
@@ -219,6 +237,89 @@ class TreeholePostIntegrationTest {
     assertEquals("PRIVATE", body.get("treeholeReviewStatus"));
     assertEquals("PENDING", body.get("status"));
     assertEquals("ONLY_ME", body.get("visibleScope"));
+    Long postId = ((Number) body.get("id")).longValue();
+    verify(treeholeReviewService).handleTreeholeReviewRequested(
+      argThat(event ->
+        event.postId().equals(postId) &&
+        event.expectedVisibility().name().equals("ONLY_ME") &&
+        event.initialReviewStatus().name().equals("PRIVATE") &&
+        !event.moderationFlagged() &&
+        !event.crisisFlagged()
+      )
+    );
+  }
+
+  @Test
+  void treeholeHardBlockedSensitiveWordFailsBeforeSave() {
+    String adminToken = registerAndLoginAsAdmin("th_admin4", "th_admin4@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author4", "th_author4@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "hardblock");
+
+    ResponseEntity<Map> postResp = postJson(
+      "/api/posts",
+      Map.of(
+        "title",
+        "Treehole hardblock",
+        "content",
+        "Content",
+        "categoryId",
+        target.categoryId(),
+        "tagIds",
+        List.of(target.tagId()),
+        "type",
+        "TREEHOLE",
+        "treeholeExpectedVisibility",
+        "PUBLIC"
+      ),
+      authorToken
+    );
+
+    assertEquals(HttpStatus.BAD_REQUEST, postResp.getStatusCode());
+    assertEquals("Post contains sensitive content", postResp.getBody().get("error"));
+    verify(treeholeReviewService, never()).handleTreeholeReviewRequested(
+      any(TreeholeReviewRequestedEvent.class)
+    );
+  }
+
+  @Test
+  void treeholeCrisisWordSucceedsAndRequestsReview() {
+    String adminToken = registerAndLoginAsAdmin("th_admin5", "th_admin5@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author5", "th_author5@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "crisis");
+
+    ResponseEntity<Map> postResp = postJson(
+      "/api/posts",
+      Map.of(
+        "title",
+        "Treehole crisisword",
+        "content",
+        "Content",
+        "categoryId",
+        target.categoryId(),
+        "tagIds",
+        List.of(target.tagId()),
+        "type",
+        "TREEHOLE",
+        "treeholeExpectedVisibility",
+        "PUBLIC"
+      ),
+      authorToken
+    );
+
+    assertEquals(HttpStatus.OK, postResp.getStatusCode());
+    Map body = postResp.getBody();
+    Long postId = ((Number) body.get("id")).longValue();
+    assertEquals("AI_REVIEWING", body.get("treeholeReviewStatus"));
+    assertEquals("PENDING", body.get("status"));
+    assertEquals("ONLY_ME", body.get("visibleScope"));
+    verify(treeholeReviewService).handleTreeholeReviewRequested(
+      argThat(event ->
+        event.postId().equals(postId) &&
+        event.moderationFlagged() &&
+        event.crisisFlagged() &&
+        "crisisword".equals(event.matchedWord())
+      )
+    );
   }
 
   @Test
