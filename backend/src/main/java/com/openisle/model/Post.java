@@ -70,6 +70,14 @@ public class Post {
   @Column(nullable = false)
   private PostVisibleScopeType visibleScope = PostVisibleScopeType.ALL;
 
+  @Enumerated(EnumType.STRING)
+  @Column(name = "treehole_expected_visibility", length = 32)
+  private TreeholeExpectedVisibility treeholeExpectedVisibility;
+
+  @Enumerated(EnumType.STRING)
+  @Column(name = "treehole_review_status", length = 32)
+  private TreeholeReviewStatus treeholeReviewStatus;
+
   @Column(nullable = false)
   private boolean closed = false;
 

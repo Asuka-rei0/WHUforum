@@ -122,6 +122,8 @@ public class PostMapper {
     dto.setClosed(post.isClosed());
     dto.setVisibleScope(post.getVisibleScope());
     dto.setType(post.getType());
+    dto.setTreeholeExpectedVisibility(post.getTreeholeExpectedVisibility());
+    dto.setTreeholeReviewStatus(post.getTreeholeReviewStatus());
     dto.setAnonymous(post.isAnonymous());
     dto.setAnonymousAlias(post.getAnonymousAlias());
     fleaMarketItemRepository
@@ -148,6 +150,8 @@ public class PostMapper {
     dto.setRssExcluded(post.getRssExcluded() == null || post.getRssExcluded());
     dto.setClosed(post.isClosed());
     dto.setVisibleScope(post.getVisibleScope());
+    dto.setTreeholeExpectedVisibility(post.getTreeholeExpectedVisibility());
+    dto.setTreeholeReviewStatus(post.getTreeholeReviewStatus());
     dto.setAnonymous(post.isAnonymous());
     dto.setAnonymousAlias(post.getAnonymousAlias());
     fleaMarketItemRepository

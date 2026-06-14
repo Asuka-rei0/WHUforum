@@ -68,6 +68,7 @@ public class PostController {
       req.getTagIds(),
       req.getType(),
       req.getPostVisibleScopeType(),
+      req.getTreeholeExpectedVisibility(),
       req.getPrizeDescription(),
       req.getPrizeIcon(),
       req.getPrizeCount(),

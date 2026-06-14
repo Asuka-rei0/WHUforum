@@ -3,6 +3,8 @@ package com.openisle.dto;
 import com.openisle.model.PostStatus;
 import com.openisle.model.PostType;
 import com.openisle.model.PostVisibleScopeType;
+import com.openisle.model.TreeholeExpectedVisibility;
+import com.openisle.model.TreeholeReviewStatus;
 import java.time.LocalDateTime;
 import java.util.List;
 import lombok.Data;
@@ -36,6 +38,8 @@ public class PostSummaryDto {
   private boolean rssExcluded;
   private boolean closed;
   private PostVisibleScopeType visibleScope;
+  private TreeholeExpectedVisibility treeholeExpectedVisibility;
+  private TreeholeReviewStatus treeholeReviewStatus;
   private boolean anonymous;
   private String anonymousAlias;
   private boolean ownedByCurrentUser;

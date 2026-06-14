@@ -265,6 +265,7 @@ public class PostService {
     List<Long> tagIds,
     PostType type,
     PostVisibleScopeType postVisibleScopeType,
+    TreeholeExpectedVisibility treeholeExpectedVisibility,
     String prizeDescription,
     String prizeIcon,
     Integer prizeCount,
@@ -303,6 +304,7 @@ public class PostService {
       throw new IllegalArgumentException("Tag not found");
     }
     PostType actualType = type != null ? type : PostType.NORMAL;
+    boolean treeholePost = actualType == PostType.TREEHOLE;
     Post post;
     if (actualType == PostType.LOTTERY) {
       if (pointCost != null && (pointCost < 0 || pointCost > 100)) {
@@ -357,18 +359,20 @@ public class PostService {
       title + "\n" + content
     );
     boolean needsReview = publishMode == PublishMode.REVIEW || moderation.flagged();
-    post.setStatus(needsReview ? PostStatus.PENDING : PostStatus.PUBLISHED);
+    if (treeholePost) {
+      initializeTreeholeState(post, treeholeExpectedVisibility);
+    } else {
+      post.setStatus(needsReview ? PostStatus.PENDING : PostStatus.PUBLISHED);
+      post.setAnonymous(Boolean.TRUE.equals(anonymous));
+      if (Objects.isNull(postVisibleScopeType)) {
+        post.setVisibleScope(PostVisibleScopeType.ALL);
+      } else {
+        post.setVisibleScope(postVisibleScopeType);
+      }
+    }
     post.setLastReplyAt(LocalDateTime.now());
-    post.setAnonymous(Boolean.TRUE.equals(anonymous));
     if (post.isAnonymous()) {
       post.setAnonymousAlias(anonymousAuditService.createAlias());
-    }
-
-    // 什么都没设置的情况下，默认为ALL
-    if (Objects.isNull(postVisibleScopeType)) {
-      post.setVisibleScope(PostVisibleScopeType.ALL);
-    } else {
-      post.setVisibleScope(postVisibleScopeType);
     }
 
     if (post instanceof LotteryPost) {
@@ -382,7 +386,12 @@ public class PostService {
     }
     imageUploader.addReferences(imageUploader.extractUrls(content));
     if (post.isAnonymous()) {
-      anonymousAuditService.recordPost(post, author, post.getAnonymousAlias(), "anonymous post");
+      anonymousAuditService.recordPost(
+        post,
+        author,
+        post.getAnonymousAlias(),
+        treeholePost ? "treehole post" : "anonymous post"
+      );
     }
     if (Boolean.TRUE.equals(fleaMarket)) {
       FleaMarketItem item = new FleaMarketItem();
@@ -392,7 +401,7 @@ public class PostService {
       item.setContact(StringUtils.trimToNull(fleaContact));
       fleaMarketItemRepository.save(item);
     }
-    if (post.getStatus() == PostStatus.PENDING) {
+    if (post.getStatus() == PostStatus.PENDING && !isInitialTreeholeReviewState(post)) {
       java.util.List<User> admins = userRepository.findByRole(com.openisle.model.Role.ADMIN);
       for (User admin : admins) {
         notificationService.createNotification(
@@ -1116,7 +1125,11 @@ public class PostService {
   }
 
   public List<Post> listPendingPosts() {
-    return postRepository.findByStatus(PostStatus.PENDING);
+    return postRepository
+      .findByStatus(PostStatus.PENDING)
+      .stream()
+      .filter(post -> !isInitialTreeholeReviewState(post))
+      .toList();
   }
 
   @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
@@ -1565,5 +1578,32 @@ public class PostService {
     // 这里必须将list包装为arrayList类型，否则序列化会有问题
     // list.sublist返回的是内部类
     return new ArrayList<>(posts.subList(from, to));
+  }
+
+  private void initializeTreeholeState(
+    Post post,
+    TreeholeExpectedVisibility requestedVisibility
+  ) {
+    TreeholeExpectedVisibility expectedVisibility =
+      requestedVisibility != null ? requestedVisibility : TreeholeExpectedVisibility.ONLY_ME;
+    post.setAnonymous(true);
+    post.setVisibleScope(PostVisibleScopeType.ONLY_ME);
+    post.setStatus(PostStatus.PENDING);
+    post.setTreeholeExpectedVisibility(expectedVisibility);
+    post.setTreeholeReviewStatus(
+      expectedVisibility == TreeholeExpectedVisibility.PUBLIC
+        ? TreeholeReviewStatus.AI_REVIEWING
+        : TreeholeReviewStatus.PRIVATE
+    );
+  }
+
+  private boolean isInitialTreeholeReviewState(Post post) {
+    return (
+      post.getType() == PostType.TREEHOLE &&
+      (
+        post.getTreeholeReviewStatus() == TreeholeReviewStatus.AI_REVIEWING ||
+        post.getTreeholeReviewStatus() == TreeholeReviewStatus.PRIVATE
+      )
+    );
   }
 }
