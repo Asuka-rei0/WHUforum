@@ -19,6 +19,8 @@ import com.openisle.repository.PostRepository;
 import com.openisle.repository.PostSubscriptionRepository;
 import com.openisle.repository.ReactionRepository;
 import com.openisle.repository.TagRepository;
+import com.openisle.repository.TreeholeInterventionCaseRepository;
+import com.openisle.repository.TreeholeInterventionRecordRepository;
 import com.openisle.repository.UserRepository;
 import com.openisle.search.SearchIndexEventPublisher;
 import com.openisle.service.EmailSender;
@@ -447,22 +449,24 @@ public class PostService {
         );
       }
     }
-    // notify followers of author
-    for (User u : subscriptionService.getSubscribers(author.getUsername())) {
-      if (!u.getId().equals(author.getId())) {
-        notificationService.createNotification(
-          u,
-          NotificationType.FOLLOWED_POST,
-          post,
-          null,
-          null,
-          author,
-          null,
-          null
-        );
+    if (!post.isAnonymous()) {
+      // notify followers of author
+      for (User u : subscriptionService.getSubscribers(author.getUsername())) {
+        if (!u.getId().equals(author.getId())) {
+          notificationService.createNotification(
+            u,
+            NotificationType.FOLLOWED_POST,
+            post,
+            null,
+            null,
+            author,
+            null,
+            null
+          );
+        }
       }
+      notificationService.notifyMentions(content, author, post, null);
     }
-    notificationService.notifyMentions(content, author, post, null);
 
     if (post instanceof LotteryPost lp && lp.getEndTime() != null) {
       ScheduledFuture<?> future = taskScheduler.schedule(
@@ -805,29 +809,13 @@ public class PostService {
 
   @Transactional
   public Post viewPost(Long id, String viewer) {
-    Post post = postRepository
-      .findById(id)
-      .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
-    if (post.getStatus() != PostStatus.PUBLISHED) {
-      if (viewer == null) {
-        throw new com.openisle.exception.NotFoundException("User not found");
-      }
-      User viewerUser = userRepository
-        .findByUsername(viewer)
-        .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
-      if (
-        !viewerUser.getRole().equals(com.openisle.model.Role.ADMIN) &&
-        !viewerUser.getId().equals(post.getAuthor().getId())
-      ) {
-        throw new com.openisle.exception.NotFoundException("Post not found");
-      }
-    }
+    Post post = getViewablePost(id, viewer);
     post.setViews(post.getViews() + 1);
     post = postRepository.save(post);
     if (viewer != null) {
       postReadService.recordRead(viewer, id);
     }
-    if (viewer != null && !viewer.equals(post.getAuthor().getUsername())) {
+    if (viewer != null && !post.isAnonymous() && !viewer.equals(post.getAuthor().getUsername())) {
       User viewerUser = userRepository.findByUsername(viewer).orElse(null);
       if (viewerUser != null) {
         notificationRepository.deleteByTypeAndFromUserAndPost(
@@ -845,6 +833,30 @@ public class PostService {
           null,
           null
         );
+      }
+    }
+    return post;
+  }
+
+  public Post getViewablePost(Long id, String viewer) {
+    Post post = postRepository
+      .findById(id)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
+    boolean publicVisible =
+      post.getStatus() == PostStatus.PUBLISHED &&
+      post.getVisibleScope() == PostVisibleScopeType.ALL;
+    if (!publicVisible) {
+      if (viewer == null) {
+        throw new com.openisle.exception.NotFoundException("Post not found");
+      }
+      User viewerUser = userRepository
+        .findByUsername(viewer)
+        .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+      if (
+        !viewerUser.getRole().equals(com.openisle.model.Role.ADMIN) &&
+        !viewerUser.getId().equals(post.getAuthor().getId())
+      ) {
+        throw new com.openisle.exception.NotFoundException("Post not found");
       }
     }
     return post;
@@ -1013,11 +1025,12 @@ public class PostService {
       .findByUsername(username)
       .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
     Pageable pageable = PageRequest.of(0, limit);
-    return postRepository.findByAuthorAndStatusOrderByCreatedAtDesc(
-      user,
-      PostStatus.PUBLISHED,
-      pageable
-    );
+    return postRepository
+      .findByAuthorAndStatusOrderByCreatedAtDesc(user, PostStatus.PUBLISHED, pageable)
+      .stream()
+      .filter(post -> !post.isAnonymous())
+      .filter(post -> post.getVisibleScope() == PostVisibleScopeType.ALL)
+      .toList();
   }
 
   public java.time.LocalDateTime getLastPostTime(String username) {
@@ -1163,7 +1176,7 @@ public class PostService {
     return postRepository
       .findByStatus(PostStatus.PENDING)
       .stream()
-      .filter(post -> !isInitialTreeholeReviewState(post))
+      .filter(post -> post.getType() != PostType.TREEHOLE)
       .toList();
   }
 
@@ -1172,6 +1185,9 @@ public class PostService {
     Post post = postRepository
       .findById(id)
       .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
+    if (post.getType() == PostType.TREEHOLE) {
+      throw new IllegalArgumentException("Use treehole intervention workflow");
+    }
     // publish all pending tags along with the post
     for (com.openisle.model.Tag tag : post.getTags()) {
       if (!tag.isApproved()) {
@@ -1200,6 +1216,9 @@ public class PostService {
     Post post = postRepository
       .findById(id)
       .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
+    if (post.getType() == PostType.TREEHOLE) {
+      throw new IllegalArgumentException("Use treehole intervention workflow");
+    }
     // remove user created tags that are only linked to this post
     java.util.Set<com.openisle.model.Tag> tags = new java.util.HashSet<>(post.getTags());
     for (com.openisle.model.Tag tag : tags) {
@@ -1340,7 +1359,9 @@ public class PostService {
     post.setVisibleScope(postVisibleScopeType);
     Post updated = postRepository.save(post);
     imageUploader.adjustReferences(oldContent, content);
-    notificationService.notifyMentions(content, user, updated, null);
+    if (!updated.isAnonymous()) {
+      notificationService.notifyMentions(content, user, updated, null);
+    }
     if (!java.util.Objects.equals(oldTitle, title)) {
       postChangeLogService.recordTitleChange(updated, user, oldTitle, title);
     }
@@ -1425,6 +1446,7 @@ public class PostService {
     }
     String title = post.getTitle();
     Long postId = post.getId();
+    deleteTreeholeInterventionData(post);
     postChangeLogService.deleteLogsForPost(post);
     postRepository.delete(post);
     searchIndexEventPublisher.publishPostDeleted(postId);
@@ -1657,5 +1679,17 @@ public class PostService {
         moderation.matchedWord()
       )
     );
+  }
+
+  private void deleteTreeholeInterventionData(Post post) {
+    if (post.getType() != PostType.TREEHOLE || post.getId() == null) {
+      return;
+    }
+    applicationContext
+      .getBean(TreeholeInterventionRecordRepository.class)
+      .deleteByPost_Id(post.getId());
+    applicationContext
+      .getBean(TreeholeInterventionCaseRepository.class)
+      .deleteByPost_Id(post.getId());
   }
 }

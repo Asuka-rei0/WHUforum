@@ -16,6 +16,8 @@ public interface TreeholeInterventionCaseRepository
 
   boolean existsByPost_Id(Long postId);
 
+  void deleteByPost_Id(Long postId);
+
   @Query(
     "SELECT c FROM TreeholeInterventionCase c JOIN c.post p " +
     "WHERE (:riskLevel IS NULL OR p.treeholeRiskLevel = :riskLevel) " +

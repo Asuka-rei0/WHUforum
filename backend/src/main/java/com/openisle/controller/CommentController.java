@@ -10,6 +10,7 @@ import com.openisle.mapper.PostChangeLogMapper;
 import com.openisle.mapper.PostMapper;
 import com.openisle.model.Comment;
 import com.openisle.model.CommentSort;
+import com.openisle.model.Post;
 import com.openisle.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
@@ -44,6 +45,7 @@ public class CommentController {
   private final PostChangeLogService changeLogService;
   private final PostChangeLogMapper postChangeLogMapper;
   private final PostMapper postMapper;
+  private final PostService postService;
 
   @Value("${app.captcha.enabled:false}")
   private boolean captchaEnabled;
@@ -69,13 +71,14 @@ public class CommentController {
       log.debug("Captcha verification failed for user {} on post {}", auth.getName(), postId);
       return ResponseEntity.badRequest().build();
     }
+    Post post = postService.getViewablePost(postId, auth.getName());
     Comment comment = commentService.addComment(
       auth.getName(),
       postId,
       req.getContent(),
       Boolean.TRUE.equals(req.getAnonymous())
     );
-    CommentDto dto = commentMapper.toDto(comment);
+    CommentDto dto = commentMapper.toDto(comment, auth.getName(), post.isAnonymous());
     dto.setReward(levelService.awardForComment(auth.getName()));
     dto.setPointReward(pointService.awardForComment(auth.getName(), postId, comment.getId()));
     log.debug("createComment succeeded for comment {}", comment.getId());
@@ -100,13 +103,15 @@ public class CommentController {
       log.debug("Captcha verification failed for user {} on comment {}", auth.getName(), commentId);
       return ResponseEntity.badRequest().build();
     }
+    Comment parent = commentService.getComment(commentId);
+    Post post = postService.getViewablePost(parent.getPost().getId(), auth.getName());
     Comment comment = commentService.addReply(
       auth.getName(),
       commentId,
       req.getContent(),
       Boolean.TRUE.equals(req.getAnonymous())
     );
-    CommentDto dto = commentMapper.toDto(comment);
+    CommentDto dto = commentMapper.toDto(comment, auth.getName(), post.isAnonymous());
     dto.setReward(levelService.awardForComment(auth.getName()));
     log.debug("replyComment succeeded for comment {}", comment.getId());
     return ResponseEntity.ok(dto);
@@ -125,18 +130,21 @@ public class CommentController {
     @PathVariable Long postId,
     @RequestParam(value = "sort", required = false, defaultValue = "OLDEST") CommentSort sort,
     @RequestParam(value = "page", required = false, defaultValue = "0") int page,
-    @RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize
+    @RequestParam(value = "pageSize", required = false, defaultValue = "20") int pageSize,
+    Authentication auth
   ) {
     log.debug("listComments called for post {} with sort {}", postId, sort);
+    String viewer = auth != null ? auth.getName() : null;
+    Post post = postService.getViewablePost(postId, viewer);
     List<CommentDto> commentDtoList = commentService
       .getCommentsForPost(postId, sort)
       .stream()
-      .map(commentMapper::toDtoWithReplies)
+      .map(comment -> commentMapper.toDtoWithReplies(comment, viewer, post.isAnonymous()))
       .collect(Collectors.toList());
     List<PostChangeLogDto> postChangeLogDtoList = changeLogService
       .listLogs(postId)
       .stream()
-      .map(postChangeLogMapper::toDto)
+      .map(log -> postChangeLogMapper.toDto(log, post.isAnonymous()))
       .collect(Collectors.toList());
     List<TimelineItemDto<?>> itemDtoList = new ArrayList<>();
 
@@ -226,17 +234,22 @@ public class CommentController {
     description = "Comment context",
     content = @Content(schema = @Schema(implementation = CommentContextDto.class))
   )
-  public ResponseEntity<CommentContextDto> getCommentContext(@PathVariable Long commentId) {
+  public ResponseEntity<CommentContextDto> getCommentContext(
+    @PathVariable Long commentId,
+    Authentication auth
+  ) {
     log.debug("getCommentContext called for comment {}", commentId);
     Comment comment = commentService.getComment(commentId);
+    String viewer = auth != null ? auth.getName() : null;
+    Post post = postService.getViewablePost(comment.getPost().getId(), viewer);
     CommentContextDto dto = new CommentContextDto();
-    dto.setPost(postMapper.toSummaryDto(comment.getPost()));
-    dto.setTargetComment(commentMapper.toDtoWithReplies(comment));
+    dto.setPost(postMapper.toSummaryDto(post));
+    dto.setTargetComment(commentMapper.toDtoWithReplies(comment, viewer, post.isAnonymous()));
     dto.setPreviousComments(
       commentService
         .getCommentsBefore(comment)
         .stream()
-        .map(commentMapper::toDtoWithReplies)
+        .map(previous -> commentMapper.toDtoWithReplies(previous, viewer, post.isAnonymous()))
         .collect(Collectors.toList())
     );
     log.debug(

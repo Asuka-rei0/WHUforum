@@ -1,5 +1,8 @@
 package com.openisle.controller;
 
+import com.openisle.model.Comment;
+import com.openisle.service.CommentService;
+import com.openisle.service.PostService;
 import com.openisle.service.SubscriptionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -15,12 +18,15 @@ import org.springframework.web.bind.annotation.*;
 public class SubscriptionController {
 
   private final SubscriptionService subscriptionService;
+  private final PostService postService;
+  private final CommentService commentService;
 
   @PostMapping("/posts/{postId}")
   @Operation(summary = "Subscribe post", description = "Subscribe to a post")
   @ApiResponse(responseCode = "200", description = "Subscribed")
   @SecurityRequirement(name = "JWT")
   public void subscribePost(@PathVariable Long postId, Authentication auth) {
+    postService.getViewablePost(postId, auth.getName());
     subscriptionService.subscribePost(auth.getName(), postId);
   }
 
@@ -29,6 +35,7 @@ public class SubscriptionController {
   @ApiResponse(responseCode = "200", description = "Unsubscribed")
   @SecurityRequirement(name = "JWT")
   public void unsubscribePost(@PathVariable Long postId, Authentication auth) {
+    postService.getViewablePost(postId, auth.getName());
     subscriptionService.unsubscribePost(auth.getName(), postId);
   }
 
@@ -37,6 +44,8 @@ public class SubscriptionController {
   @ApiResponse(responseCode = "200", description = "Subscribed")
   @SecurityRequirement(name = "JWT")
   public void subscribeComment(@PathVariable Long commentId, Authentication auth) {
+    Comment comment = commentService.getComment(commentId);
+    postService.getViewablePost(comment.getPost().getId(), auth.getName());
     subscriptionService.subscribeComment(auth.getName(), commentId);
   }
 
@@ -45,6 +54,8 @@ public class SubscriptionController {
   @ApiResponse(responseCode = "200", description = "Unsubscribed")
   @SecurityRequirement(name = "JWT")
   public void unsubscribeComment(@PathVariable Long commentId, Authentication auth) {
+    Comment comment = commentService.getComment(commentId);
+    postService.getViewablePost(comment.getPost().getId(), auth.getName());
     subscriptionService.unsubscribeComment(auth.getName(), commentId);
   }
 

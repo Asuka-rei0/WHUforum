@@ -10,4 +10,6 @@ public interface TreeholeInterventionRecordRepository
   List<TreeholeInterventionRecord> findByInterventionCase_IdOrderByCreatedAtAsc(Long caseId);
 
   long countByPost_IdAndAction(Long postId, TreeholeInterventionAction action);
+
+  void deleteByPost_Id(Long postId);
 }
