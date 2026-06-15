@@ -66,6 +66,16 @@
             <span class="menu-item-text">站点统计</span>
           </NuxtLink>
           <NuxtLink
+            v-if="shouldShowStats"
+            class="menu-item"
+            exact-active-class="selected"
+            to="/admin/treeholes"
+            @click="handleItemClick"
+          >
+            <message-one class="menu-item-icon" />
+            <span class="menu-item-text">树洞复审</span>
+          </NuxtLink>
+          <NuxtLink
             v-if="authState.loggedIn"
             class="menu-item"
             exact-active-class="selected"
