@@ -152,6 +152,18 @@ class TreeholePostIntegrationTest {
     return rest.exchange(url, HttpMethod.GET, new HttpEntity<>(h), List.class);
   }
 
+  private ResponseEntity<String> getString(String url, String token) {
+    HttpHeaders h = new HttpHeaders();
+    if (token != null) h.setBearerAuth(token);
+    return rest.exchange(url, HttpMethod.GET, new HttpEntity<>(h), String.class);
+  }
+
+  private ResponseEntity<Map> postEmpty(String url, String token) {
+    HttpHeaders h = new HttpHeaders();
+    if (token != null) h.setBearerAuth(token);
+    return rest.exchange(url, HttpMethod.POST, new HttpEntity<>(h), Map.class);
+  }
+
   private PostTarget createPostTarget(String adminToken, String suffix) {
     ResponseEntity<Map> catResp = postJson(
       "/api/categories",
@@ -258,6 +270,10 @@ class TreeholePostIntegrationTest {
     return records
       .stream()
       .anyMatch(record -> action.equals(((Map) record).get("action")));
+  }
+
+  private boolean listContainsText(List body, String text) {
+    return body.stream().anyMatch(item -> String.valueOf(item).contains(text));
   }
 
   @Test
@@ -475,6 +491,204 @@ class TreeholePostIntegrationTest {
     assertTrue(containsPostId(authorSquare.getBody(), reviewingId));
     assertEquals(HttpStatus.OK, otherSquare.getStatusCode());
     assertFalse(containsPostId(otherSquare.getBody(), reviewingId));
+  }
+
+  @Test
+  void publicTreeholeDetailsCommentsAndReactionsStayAnonymous() {
+    String adminToken = registerAndLoginAsAdmin("th_admin12", "th_admin12@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author12", "th_author12@whu.edu.cn");
+    String commenterToken = registerAndLogin("th_commenter12", "th_commenter12@whu.edu.cn");
+    String viewerToken = registerAndLogin("th_viewer12", "th_viewer12@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "identitysafe");
+
+    Long postId = createTreehole(authorToken, target, "identity-safe", "PUBLIC");
+    markTreeholePublic(postId);
+
+    ResponseEntity<Map> commentResp = postJson(
+      "/api/posts/" + postId + "/comments",
+      Map.of("content", "treehole public anonymous comment"),
+      commenterToken
+    );
+    assertEquals(HttpStatus.OK, commentResp.getStatusCode());
+    Long commentId = ((Number) commentResp.getBody().get("id")).longValue();
+    Map commentAuthor = (Map) commentResp.getBody().get("author");
+    assertEquals(true, commentAuthor.get("anonymous"));
+    assertNotEquals("th_commenter12", commentAuthor.get("username"));
+
+    ResponseEntity<Map> reactionResp = postJson(
+      "/api/posts/" + postId + "/reactions",
+      Map.of("type", "LIKE"),
+      commenterToken
+    );
+    assertEquals(HttpStatus.OK, reactionResp.getStatusCode());
+
+    ResponseEntity<Map> detailResp = get("/api/posts/" + postId, Map.class, viewerToken);
+    assertEquals(HttpStatus.OK, detailResp.getStatusCode());
+    Map body = detailResp.getBody();
+    Map author = (Map) body.get("author");
+    assertEquals(true, author.get("anonymous"));
+    assertNotEquals("th_author12", author.get("username"));
+    assertFalse(listContainsText((List) body.get("participants"), "th_author12"));
+    assertFalse(listContainsText((List) body.get("participants"), "th_commenter12"));
+    assertFalse(listContainsText((List) body.get("reactions"), "th_commenter12"));
+    assertTrue(((List) body.get("comments")).stream().allMatch(item -> {
+      Map comment = (Map) item;
+      Map itemAuthor = (Map) comment.get("author");
+      return Boolean.TRUE.equals(itemAuthor.get("anonymous")) &&
+        !"th_commenter12".equals(itemAuthor.get("username"));
+    }));
+
+    ResponseEntity<List> timelineResp = getList(
+      "/api/posts/" + postId + "/comments?page=0&pageSize=20",
+      viewerToken
+    );
+    assertEquals(HttpStatus.OK, timelineResp.getStatusCode());
+    assertFalse(listContainsText(timelineResp.getBody(), "th_commenter12"));
+    assertTrue(listContainsText(timelineResp.getBody(), String.valueOf(commentId)));
+  }
+
+  @Test
+  void privateTreeholeCommentAndReactionEndpointsAreAuthorOnly() {
+    String adminToken = registerAndLoginAsAdmin("th_admin13", "th_admin13@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author13", "th_author13@whu.edu.cn");
+    String otherToken = registerAndLogin("th_other13", "th_other13@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "privateaccess");
+
+    Long postId = createTreehole(authorToken, target, "private-access", "ONLY_ME");
+    ResponseEntity<Map> authorCommentCreate = postJson(
+      "/api/posts/" + postId + "/comments",
+      Map.of("content", "private author comment"),
+      authorToken
+    );
+    assertEquals(HttpStatus.OK, authorCommentCreate.getStatusCode());
+    Long commentId = ((Number) authorCommentCreate.getBody().get("id")).longValue();
+
+    ResponseEntity<List> authorComments = getList(
+      "/api/posts/" + postId + "/comments?page=0&pageSize=20",
+      authorToken
+    );
+    ResponseEntity<Map> otherComments = get(
+      "/api/posts/" + postId + "/comments?page=0&pageSize=20",
+      Map.class,
+      otherToken
+    );
+    ResponseEntity<Map> otherCommentCreate = postJson(
+      "/api/posts/" + postId + "/comments",
+      Map.of("content", "should not pass"),
+      otherToken
+    );
+    ResponseEntity<Map> otherReaction = postJson(
+      "/api/posts/" + postId + "/reactions",
+      Map.of("type", "LIKE"),
+      otherToken
+    );
+    ResponseEntity<Map> otherPostSubscription = postEmpty(
+      "/api/subscriptions/posts/" + postId,
+      otherToken
+    );
+    ResponseEntity<Map> otherCommentSubscription = postEmpty(
+      "/api/subscriptions/comments/" + commentId,
+      otherToken
+    );
+
+    assertEquals(HttpStatus.OK, authorComments.getStatusCode());
+    assertEquals(HttpStatus.NOT_FOUND, otherComments.getStatusCode());
+    assertEquals(HttpStatus.NOT_FOUND, otherCommentCreate.getStatusCode());
+    assertEquals(HttpStatus.NOT_FOUND, otherReaction.getStatusCode());
+    assertEquals(HttpStatus.NOT_FOUND, otherPostSubscription.getStatusCode());
+    assertEquals(HttpStatus.NOT_FOUND, otherCommentSubscription.getStatusCode());
+  }
+
+  @Test
+  void anonymousTreeholeDoesNotLeakThroughFollowerMentionOrReactionNotifications() {
+    String adminToken = registerAndLoginAsAdmin("th_admin15", "th_admin15@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author15", "th_author15@whu.edu.cn");
+    String followerToken = registerAndLogin("th_follower15", "th_follower15@whu.edu.cn");
+    String mentionedToken = registerAndLogin("th_mentioned15", "th_mentioned15@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "notification");
+
+    assertEquals(
+      HttpStatus.OK,
+      postEmpty("/api/subscriptions/users/th_author15", followerToken).getStatusCode()
+    );
+    clearPostLimit("th_author15");
+    ResponseEntity<Map> postResp = postJson(
+      "/api/posts",
+      Map.of(
+        "title",
+        "Treehole notification leak secret",
+        "content",
+        "Content with @[th_mentioned15] notificationLeakSecret",
+        "categoryId",
+        target.categoryId(),
+        "tagIds",
+        List.of(target.tagId()),
+        "type",
+        "TREEHOLE",
+        "treeholeExpectedVisibility",
+        "PUBLIC"
+      ),
+      authorToken
+    );
+    assertEquals(HttpStatus.OK, postResp.getStatusCode());
+
+    ResponseEntity<String> followerNotifications = getString("/api/notifications", followerToken);
+    ResponseEntity<String> mentionedNotifications = getString("/api/notifications", mentionedToken);
+    assertEquals(HttpStatus.OK, followerNotifications.getStatusCode());
+    assertFalse(followerNotifications.getBody().contains("notificationLeakSecret"));
+    assertFalse(followerNotifications.getBody().contains("th_author15"));
+    assertEquals(HttpStatus.OK, mentionedNotifications.getStatusCode());
+    assertFalse(mentionedNotifications.getBody().contains("notificationLeakSecret"));
+    assertFalse(mentionedNotifications.getBody().contains("th_author15"));
+
+    String reactionAuthorToken = registerAndLogin("th_author15b", "th_author15b@whu.edu.cn");
+    String reactorToken = registerAndLogin("th_reactor15b", "th_reactor15b@whu.edu.cn");
+    clearPostLimit("th_author15b");
+    Long publicPostId = createTreehole(reactionAuthorToken, target, "reaction-notify", "PUBLIC");
+    markTreeholePublic(publicPostId);
+    ResponseEntity<Map> reactionResp = postJson(
+      "/api/posts/" + publicPostId + "/reactions",
+      Map.of("type", "LIKE"),
+      reactorToken
+    );
+    assertEquals(HttpStatus.OK, reactionResp.getStatusCode());
+    ResponseEntity<String> authorNotifications = getString(
+      "/api/notifications",
+      reactionAuthorToken
+    );
+    assertEquals(HttpStatus.OK, authorNotifications.getStatusCode());
+    assertFalse(authorNotifications.getBody().contains("th_reactor15b"));
+  }
+
+  @Test
+  void publicSearchAndUserAggregationsExcludeAnonymousTreeholeComments() {
+    String adminToken = registerAndLoginAsAdmin("th_admin14", "th_admin14@whu.edu.cn");
+    String authorToken = registerAndLogin("th_author14", "th_author14@whu.edu.cn");
+    String commenterToken = registerAndLogin("th_commenter14", "th_commenter14@whu.edu.cn");
+    PostTarget target = createPostTarget(adminToken, "aggregation");
+
+    Long postId = createTreehole(authorToken, target, "aggregation", "PUBLIC");
+    markTreeholePublic(postId);
+    ResponseEntity<Map> commentResp = postJson(
+      "/api/posts/" + postId + "/comments",
+      Map.of("content", "uniqueTreeholeAggregationSecret"),
+      commenterToken
+    );
+    assertEquals(HttpStatus.OK, commentResp.getStatusCode());
+
+    ResponseEntity<String> globalSearch = getString(
+      "/api/search/global?keyword=uniqueTreeholeAggregationSecret",
+      commenterToken
+    );
+    ResponseEntity<String> userReplies = getString(
+      "/api/users/th_commenter14/replies",
+      commenterToken
+    );
+
+    assertEquals(HttpStatus.OK, globalSearch.getStatusCode(), globalSearch.getBody());
+    assertFalse(globalSearch.getBody().contains("uniqueTreeholeAggregationSecret"));
+    assertEquals(HttpStatus.OK, userReplies.getStatusCode(), userReplies.getBody());
+    assertFalse(userReplies.getBody().contains("uniqueTreeholeAggregationSecret"));
   }
 
   @Test
