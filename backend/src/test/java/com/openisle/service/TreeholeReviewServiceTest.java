@@ -30,6 +30,7 @@ class TreeholeReviewServiceTest {
   private AiReviewClient aiReviewClient;
   private NotificationService notificationService;
   private SearchIndexEventPublisher searchIndexEventPublisher;
+  private TreeholeInterventionService treeholeInterventionService;
   private TreeholeReviewService service;
 
   @BeforeEach
@@ -39,12 +40,14 @@ class TreeholeReviewServiceTest {
     aiReviewClient = mock(AiReviewClient.class);
     notificationService = mock(NotificationService.class);
     searchIndexEventPublisher = mock(SearchIndexEventPublisher.class);
+    treeholeInterventionService = mock(TreeholeInterventionService.class);
     service = new TreeholeReviewService(
       postRepository,
       userRepository,
       aiReviewClient,
       notificationService,
-      searchIndexEventPublisher
+      searchIndexEventPublisher,
+      treeholeInterventionService
     );
     ReflectionTestUtils.setField(service, "aiReviewEnabled", true);
     when(postRepository.save(any(Post.class))).thenAnswer(invocation -> invocation.getArgument(0));
@@ -101,6 +104,7 @@ class TreeholeReviewServiceTest {
     assertEquals(PostStatus.PENDING, post.getStatus());
     assertEquals(PostVisibleScopeType.ONLY_ME, post.getVisibleScope());
     assertEquals(TreeholeReviewStatus.ADMIN_REVIEWING, post.getTreeholeReviewStatus());
+    verify(treeholeInterventionService).ensureCase(eq(post), contains("risk=L2"));
     verify(notificationService).createNotification(
       eq(admin),
       eq(NotificationType.POST_REVIEW_REQUEST),
@@ -128,6 +132,7 @@ class TreeholeReviewServiceTest {
     assertEquals(PostVisibleScopeType.ONLY_ME, post.getVisibleScope());
     assertEquals(TreeholeReviewStatus.PUBLIC_RESTRICTED, post.getTreeholeReviewStatus());
     verify(searchIndexEventPublisher).publishPostDeleted(post.getId());
+    verify(treeholeInterventionService).ensureCase(eq(post), contains("risk=L3"));
     verify(notificationService).createNotification(
       eq(admin),
       eq(NotificationType.MODERATION_ALERT),
@@ -153,6 +158,7 @@ class TreeholeReviewServiceTest {
 
     assertEquals(TreeholeReviewStatus.REPORTED, post.getTreeholeReviewStatus());
     assertEquals(PostStatus.PENDING, post.getStatus());
+    verify(treeholeInterventionService).ensureCase(eq(post), contains("risk=L4"));
     verify(notificationService).createNotification(
       eq(admin),
       eq(NotificationType.MODERATION_ALERT),
@@ -181,6 +187,7 @@ class TreeholeReviewServiceTest {
     assertTrue(post.getTreeholeRiskReason().contains("timeout"));
     assertEquals("Admin manual review required", post.getTreeholeRecommendedAction());
     verify(searchIndexEventPublisher, never()).publishPostSaved(any());
+    verify(treeholeInterventionService).ensureCase(post, "Treehole AI review failed");
     verify(notificationService).createNotification(
       eq(admin),
       eq(NotificationType.POST_REVIEW_REQUEST),
