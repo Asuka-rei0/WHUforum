@@ -350,6 +350,19 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
   @Query(
     "SELECT p FROM Post p WHERE p.type = com.openisle.model.PostType.TREEHOLE AND (" +
+    "p.treeholeRiskLevel IN (" +
+    "com.openisle.model.TreeholeRiskLevel.L2, " +
+    "com.openisle.model.TreeholeRiskLevel.L3, " +
+    "com.openisle.model.TreeholeRiskLevel.L4) OR " +
+    "p.treeholeReviewStatus IN (" +
+    "com.openisle.model.TreeholeReviewStatus.ADMIN_REVIEWING, " +
+    "com.openisle.model.TreeholeReviewStatus.PUBLIC_RESTRICTED, " +
+    "com.openisle.model.TreeholeReviewStatus.REPORTED))"
+  )
+  List<Post> findTreeholeRiskPostsForIntervention();
+
+  @Query(
+    "SELECT p FROM Post p WHERE p.type = com.openisle.model.PostType.TREEHOLE AND (" +
     "(p.treeholeReviewStatus = com.openisle.model.TreeholeReviewStatus.PUBLIC " +
     "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
     "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL) OR " +

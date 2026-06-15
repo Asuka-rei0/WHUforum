@@ -31,6 +31,7 @@ public class TreeholeReviewService {
   private final AiReviewClient aiReviewClient;
   private final NotificationService notificationService;
   private final SearchIndexEventPublisher searchIndexEventPublisher;
+  private final TreeholeInterventionService treeholeInterventionService;
 
   @Value("${app.treehole.ai-review.enabled:true}")
   private boolean aiReviewEnabled;
@@ -105,6 +106,7 @@ public class TreeholeReviewService {
     post.setStatus(PostStatus.PENDING);
     post.setVisibleScope(PostVisibleScopeType.ONLY_ME);
     Post saved = postRepository.save(post);
+    treeholeInterventionService.ensureCase(saved, buildAdminMessage("Treehole requires admin review", result));
     notifyAdmins(
       saved,
       NotificationType.POST_REVIEW_REQUEST,
@@ -122,6 +124,7 @@ public class TreeholeReviewService {
     post.setVisibleScope(PostVisibleScopeType.ONLY_ME);
     Post saved = postRepository.save(post);
     searchIndexEventPublisher.publishPostDeleted(saved.getId());
+    treeholeInterventionService.ensureCase(saved, buildAdminMessage("Treehole restricted and reported", result));
     notifyAdmins(
       saved,
       NotificationType.MODERATION_ALERT,
@@ -137,6 +140,7 @@ public class TreeholeReviewService {
     post.setTreeholeRecommendedAction("Admin manual review required");
     post.setTreeholeReviewedAt(LocalDateTime.now());
     Post saved = postRepository.save(post);
+    treeholeInterventionService.ensureCase(saved, "Treehole AI review failed");
     notifyAdmins(saved, NotificationType.POST_REVIEW_REQUEST, "Treehole AI review failed");
   }
 

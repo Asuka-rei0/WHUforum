@@ -1,0 +1,13 @@
+package com.openisle.model;
+
+public enum TreeholeInterventionAction {
+  CASE_CREATED,
+  VIEW_REAL_IDENTITY,
+  MARK_FALSE_POSITIVE,
+  ALLOW_PUBLIC,
+  RESTRICT_PUBLIC,
+  MARK_CONTACTED,
+  MARK_TRANSFERRED,
+  UPDATE_NOTE,
+  CLOSE
+}
