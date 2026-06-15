@@ -9,10 +9,15 @@ import org.springframework.stereotype.Component;
 public class ReactionMapper {
 
   public ReactionDto toDto(Reaction reaction) {
+    return toDto(reaction, null, false);
+  }
+
+  public ReactionDto toDto(Reaction reaction, String viewer, boolean anonymousContext) {
     ReactionDto dto = new ReactionDto();
     dto.setId(reaction.getId());
     dto.setType(reaction.getType());
-    dto.setUser(reaction.getUser().getUsername());
+    String username = reaction.getUser().getUsername();
+    dto.setUser(anonymousContext && !username.equals(viewer) ? null : username);
     if (reaction.getPost() != null) {
       dto.setPostId(reaction.getPost().getId());
     }

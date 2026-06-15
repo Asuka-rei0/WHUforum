@@ -19,6 +19,10 @@ public class CommentMapper {
   private final UserMapper userMapper;
 
   public CommentDto toDto(Comment comment) {
+    return toDto(comment, null, false);
+  }
+
+  public CommentDto toDto(Comment comment, String viewer, boolean anonymousContext) {
     CommentDto dto = new CommentDto();
     dto.setId(comment.getId());
     dto.setContent(comment.getContent());
@@ -36,19 +40,29 @@ public class CommentMapper {
   }
 
   public CommentDto toDtoWithReplies(Comment comment) {
-    CommentDto dto = toDto(comment);
+    return toDtoWithReplies(comment, null, false);
+  }
+
+  public CommentDto toDtoWithReplies(
+    Comment comment,
+    String viewer,
+    boolean anonymousContext
+  ) {
+    boolean redactReactions =
+      anonymousContext || comment.isAnonymous() || comment.getPost().isAnonymous();
+    CommentDto dto = toDto(comment, viewer, anonymousContext);
     dto.setReplies(
       commentService
         .getReplies(comment.getId())
         .stream()
-        .map(this::toDtoWithReplies)
+        .map(reply -> toDtoWithReplies(reply, viewer, redactReactions))
         .collect(Collectors.toList())
     );
     dto.setReactions(
       reactionService
         .getReactionsForComment(comment.getId())
         .stream()
-        .map(reactionMapper::toDto)
+        .map(reaction -> reactionMapper.toDto(reaction, viewer, redactReactions))
         .collect(Collectors.toList())
     );
     return dto;

@@ -4,6 +4,7 @@ import com.openisle.model.Category;
 import com.openisle.model.Comment;
 import com.openisle.model.Post;
 import com.openisle.model.PostStatus;
+import com.openisle.model.PostVisibleScopeType;
 import com.openisle.model.Tag;
 import com.openisle.model.User;
 import com.openisle.search.event.DeleteDocumentEvent;
@@ -20,7 +21,12 @@ public class SearchIndexEventPublisher {
   private final OpenSearchProperties properties;
 
   public void publishPostSaved(Post post) {
-    if (!properties.isEnabled() || post == null || post.getStatus() != PostStatus.PUBLISHED) {
+    if (
+      !properties.isEnabled() ||
+      post == null ||
+      post.getStatus() != PostStatus.PUBLISHED ||
+      post.getVisibleScope() != PostVisibleScopeType.ALL
+    ) {
       return;
     }
     SearchDocument document = SearchDocumentFactory.fromPost(post);
@@ -38,6 +44,16 @@ public class SearchIndexEventPublisher {
 
   public void publishCommentSaved(Comment comment) {
     if (!properties.isEnabled() || comment == null) {
+      return;
+    }
+    Post post = comment.getPost();
+    if (
+      post == null ||
+      post.getStatus() != PostStatus.PUBLISHED ||
+      post.getVisibleScope() != PostVisibleScopeType.ALL ||
+      post.isAnonymous() ||
+      comment.isAnonymous()
+    ) {
       return;
     }
     SearchDocument document = SearchDocumentFactory.fromComment(comment);

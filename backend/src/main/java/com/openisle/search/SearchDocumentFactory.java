@@ -33,7 +33,7 @@ public final class SearchDocumentFactory {
       post.getId(),
       post.getTitle(),
       post.getContent(),
-      post.getAuthor() != null ? post.getAuthor().getUsername() : null,
+      !post.isAnonymous() && post.getAuthor() != null ? post.getAuthor().getUsername() : null,
       post.getCategory() != null ? post.getCategory().getName() : null,
       tags,
       post.getId(),
@@ -59,7 +59,11 @@ public final class SearchDocumentFactory {
       comment.getId(),
       post != null ? post.getTitle() : null,
       comment.getContent(),
-      comment.getAuthor() != null ? comment.getAuthor().getUsername() : null,
+      !comment.isAnonymous() &&
+        (post == null || !post.isAnonymous()) &&
+        comment.getAuthor() != null
+        ? comment.getAuthor().getUsername()
+        : null,
       post != null && post.getCategory() != null ? post.getCategory().getName() : null,
       tags,
       post != null ? post.getId() : null,

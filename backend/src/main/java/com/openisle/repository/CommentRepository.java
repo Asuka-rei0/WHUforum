@@ -22,6 +22,28 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
   List<Comment> findByAuthorOrderByCreatedAtDesc(User author, Pageable pageable);
   List<Comment> findByContentContainingIgnoreCase(String keyword);
 
+  @Query(
+    "SELECT c FROM Comment c WHERE c.author = :author " +
+    "AND c.anonymous = false AND c.post.anonymous = false " +
+    "AND c.post.status = com.openisle.model.PostStatus.PUBLISHED " +
+    "AND c.post.visibleScope = com.openisle.model.PostVisibleScopeType.ALL " +
+    "ORDER BY c.createdAt DESC"
+  )
+  List<Comment> findPublicNonAnonymousByAuthorOrderByCreatedAtDesc(
+    @Param("author") User author,
+    Pageable pageable
+  );
+
+  @Query(
+    "SELECT c FROM Comment c WHERE LOWER(c.content) LIKE LOWER(CONCAT('%', :keyword, '%')) " +
+    "AND c.anonymous = false AND c.post.anonymous = false " +
+    "AND c.post.status = com.openisle.model.PostStatus.PUBLISHED " +
+    "AND c.post.visibleScope = com.openisle.model.PostVisibleScopeType.ALL"
+  )
+  List<Comment> findPublicNonAnonymousByContentContainingIgnoreCase(
+    @Param("keyword") String keyword
+  );
+
   @Query("SELECT DISTINCT c.author FROM Comment c WHERE c.post = :post")
   java.util.List<User> findDistinctAuthorsByPost(@Param("post") Post post);
 
@@ -41,7 +63,12 @@ public interface CommentRepository extends JpaRepository<Comment, Long> {
     @Param("start") java.time.LocalDateTime start
   );
 
-  @Query("SELECT MAX(c.createdAt) FROM Comment c WHERE c.author.id = :userId")
+  @Query(
+    "SELECT MAX(c.createdAt) FROM Comment c WHERE c.author.id = :userId " +
+    "AND c.anonymous = false AND c.post.anonymous = false " +
+    "AND c.post.status = com.openisle.model.PostStatus.PUBLISHED " +
+    "AND c.post.visibleScope = com.openisle.model.PostVisibleScopeType.ALL"
+  )
   java.time.LocalDateTime findLastCommentTimeOfUserByUserId(@Param("userId") Long userId);
 
   @Query("SELECT COUNT(c) FROM Comment c WHERE c.post.id = :postId")

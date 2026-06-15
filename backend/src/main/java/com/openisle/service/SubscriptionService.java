@@ -28,7 +28,7 @@ public class SubscriptionService {
         PostSubscription ps = new PostSubscription();
         ps.setUser(user);
         ps.setPost(post);
-        if (!user.getId().equals(post.getAuthor().getId())) {
+        if (!post.isAnonymous() && !user.getId().equals(post.getAuthor().getId())) {
           notificationService.createNotification(
             post.getAuthor(),
             NotificationType.POST_SUBSCRIBED,
@@ -51,7 +51,7 @@ public class SubscriptionService {
       .findByUserAndPost(user, post)
       .ifPresent(ps -> {
         postSubRepo.delete(ps);
-        if (!user.getId().equals(post.getAuthor().getId())) {
+        if (!post.isAnonymous() && !user.getId().equals(post.getAuthor().getId())) {
           notificationService.createNotification(
             post.getAuthor(),
             NotificationType.POST_UNSUBSCRIBED,

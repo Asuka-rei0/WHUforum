@@ -299,12 +299,18 @@ public interface PostRepository extends JpaRepository<Post, Long> {
   List<Post> findByTitleContainingIgnoreCaseAndStatus(String keyword, PostStatus status);
 
   @Query(
-    "SELECT MAX(p.createdAt) FROM Post p WHERE p.author.username = :username AND p.status = com.openisle.model.PostStatus.PUBLISHED"
+    "SELECT MAX(p.createdAt) FROM Post p WHERE p.author.username = :username " +
+    "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
+    "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL " +
+    "AND p.anonymous = false"
   )
   LocalDateTime findLastPostTime(@Param("username") String username);
 
   @Query(
-    "SELECT SUM(p.views) FROM Post p WHERE p.author.username = :username AND p.status = com.openisle.model.PostStatus.PUBLISHED"
+    "SELECT SUM(p.views) FROM Post p WHERE p.author.username = :username " +
+    "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
+    "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL " +
+    "AND p.anonymous = false"
   )
   Long sumViews(@Param("username") String username);
 
