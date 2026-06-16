@@ -23,11 +23,15 @@ public class PostChangeLogMapper {
   private final TagMapper tagMapper;
 
   public PostChangeLogDto toDto(PostChangeLog log) {
+    return toDto(log, false);
+  }
+
+  public PostChangeLogDto toDto(PostChangeLog log, boolean anonymousContext) {
     PostChangeLogDto dto = new PostChangeLogDto();
     dto.setId(log.getId());
     if (log.getUser() != null) {
-      dto.setUsername(log.getUser().getUsername());
-      dto.setUserAvatar(log.getUser().getAvatar());
+      dto.setUsername(anonymousContext ? "匿名用户" : log.getUser().getUsername());
+      dto.setUserAvatar(anonymousContext ? "/whu-emblem.webp" : log.getUser().getAvatar());
     }
     dto.setType(log.getType());
     dto.setTime(log.getCreatedAt());

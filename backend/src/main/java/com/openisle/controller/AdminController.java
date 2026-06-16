@@ -8,6 +8,7 @@ import com.openisle.exception.EmailSendException;
 import com.openisle.service.AnonymousAuditService;
 import com.openisle.service.EmailSender;
 import com.openisle.service.SensitiveWordService;
+import com.openisle.service.TreeholeInterventionService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -21,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -41,6 +43,7 @@ public class AdminController {
   private final AnonymousAuditService anonymousAuditService;
   private final SensitiveWordService sensitiveWordService;
   private final EmailSender emailSender;
+  private final TreeholeInterventionService treeholeInterventionService;
 
   @GetMapping("/api/admin/hello")
   @SecurityRequirement(name = "JWT")
@@ -65,8 +68,14 @@ public class AdminController {
     description = "Anonymous audit records",
     content = @Content(schema = @Schema(implementation = AnonymousAuditDto.class))
   )
-  public List<AnonymousAuditDto> listAnonymousAudit(@PathVariable Long postId) {
-    return anonymousAuditService.listByPost(postId);
+  public List<AnonymousAuditDto> listAnonymousAudit(
+    @PathVariable Long postId,
+    Authentication auth
+  ) {
+    if (auth != null) {
+      treeholeInterventionService.recordLegacyAnonymousReveal(postId, auth.getName());
+    }
+    return anonymousAuditService.listByPost(postId, auth.getName());
   }
 
   @GetMapping("/api/admin/sensitive-words")

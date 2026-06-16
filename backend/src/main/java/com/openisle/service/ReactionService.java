@@ -64,7 +64,7 @@ public class ReactionService {
     reaction.setPost(post);
     reaction.setType(type);
     reaction = reactionRepository.save(reaction);
-    if (!user.getId().equals(post.getAuthor().getId())) {
+    if (!post.isAnonymous() && !user.getId().equals(post.getAuthor().getId())) {
       notificationService.createNotification(
         post.getAuthor(),
         NotificationType.REACTION,
@@ -103,7 +103,11 @@ public class ReactionService {
     reaction.setPost(null);
     reaction.setType(type);
     reaction = reactionRepository.save(reaction);
-    if (!user.getId().equals(comment.getAuthor().getId())) {
+    if (
+      !comment.isAnonymous() &&
+      !comment.getPost().isAnonymous() &&
+      !user.getId().equals(comment.getAuthor().getId())
+    ) {
       notificationService.createNotification(
         comment.getAuthor(),
         NotificationType.REACTION,

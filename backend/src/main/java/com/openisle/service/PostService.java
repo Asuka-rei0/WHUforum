@@ -1,6 +1,7 @@
 package com.openisle.service;
 
 import com.openisle.config.CachingConfig;
+import com.openisle.event.TreeholeReviewRequestedEvent;
 import com.openisle.exception.EmailSendException;
 import com.openisle.exception.NotFoundException;
 import com.openisle.exception.RateLimitException;
@@ -18,6 +19,8 @@ import com.openisle.repository.PostRepository;
 import com.openisle.repository.PostSubscriptionRepository;
 import com.openisle.repository.ReactionRepository;
 import com.openisle.repository.TagRepository;
+import com.openisle.repository.TreeholeInterventionCaseRepository;
+import com.openisle.repository.TreeholeInterventionRecordRepository;
 import com.openisle.repository.UserRepository;
 import com.openisle.search.SearchIndexEventPublisher;
 import com.openisle.service.EmailSender;
@@ -257,6 +260,7 @@ public class PostService {
   }
 
   @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
+  @Transactional
   public Post createPost(
     String username,
     Long categoryId,
@@ -265,6 +269,7 @@ public class PostService {
     List<Long> tagIds,
     PostType type,
     PostVisibleScopeType postVisibleScopeType,
+    TreeholeExpectedVisibility treeholeExpectedVisibility,
     String prizeDescription,
     String prizeIcon,
     Integer prizeCount,
@@ -303,6 +308,7 @@ public class PostService {
       throw new IllegalArgumentException("Tag not found");
     }
     PostType actualType = type != null ? type : PostType.NORMAL;
+    boolean treeholePost = actualType == PostType.TREEHOLE;
     Post post;
     if (actualType == PostType.LOTTERY) {
       if (pointCost != null && (pointCost < 0 || pointCost > 100)) {
@@ -356,19 +362,24 @@ public class PostService {
     ModerationService.ModerationResult moderation = moderationService.inspect(
       title + "\n" + content
     );
+    if (treeholePost && moderation.flagged() && !moderation.crisis()) {
+      throw new IllegalArgumentException("Post contains sensitive content");
+    }
     boolean needsReview = publishMode == PublishMode.REVIEW || moderation.flagged();
-    post.setStatus(needsReview ? PostStatus.PENDING : PostStatus.PUBLISHED);
+    if (treeholePost) {
+      initializeTreeholeState(post, treeholeExpectedVisibility);
+    } else {
+      post.setStatus(needsReview ? PostStatus.PENDING : PostStatus.PUBLISHED);
+      post.setAnonymous(Boolean.TRUE.equals(anonymous));
+      if (Objects.isNull(postVisibleScopeType)) {
+        post.setVisibleScope(PostVisibleScopeType.ALL);
+      } else {
+        post.setVisibleScope(postVisibleScopeType);
+      }
+    }
     post.setLastReplyAt(LocalDateTime.now());
-    post.setAnonymous(Boolean.TRUE.equals(anonymous));
     if (post.isAnonymous()) {
       post.setAnonymousAlias(anonymousAuditService.createAlias());
-    }
-
-    // 什么都没设置的情况下，默认为ALL
-    if (Objects.isNull(postVisibleScopeType)) {
-      post.setVisibleScope(PostVisibleScopeType.ALL);
-    } else {
-      post.setVisibleScope(postVisibleScopeType);
     }
 
     if (post instanceof LotteryPost) {
@@ -382,7 +393,15 @@ public class PostService {
     }
     imageUploader.addReferences(imageUploader.extractUrls(content));
     if (post.isAnonymous()) {
-      anonymousAuditService.recordPost(post, author, post.getAnonymousAlias(), "anonymous post");
+      anonymousAuditService.recordPost(
+        post,
+        author,
+        post.getAnonymousAlias(),
+        treeholePost ? "treehole post" : "anonymous post"
+      );
+    }
+    if (treeholePost) {
+      publishTreeholeReviewRequested(post, moderation);
     }
     if (Boolean.TRUE.equals(fleaMarket)) {
       FleaMarketItem item = new FleaMarketItem();
@@ -392,7 +411,7 @@ public class PostService {
       item.setContact(StringUtils.trimToNull(fleaContact));
       fleaMarketItemRepository.save(item);
     }
-    if (post.getStatus() == PostStatus.PENDING) {
+    if (post.getStatus() == PostStatus.PENDING && !isInitialTreeholeReviewState(post)) {
       java.util.List<User> admins = userRepository.findByRole(com.openisle.model.Role.ADMIN);
       for (User admin : admins) {
         notificationService.createNotification(
@@ -431,22 +450,24 @@ public class PostService {
         );
       }
     }
-    // notify followers of author
-    for (User u : subscriptionService.getSubscribers(author.getUsername())) {
-      if (!u.getId().equals(author.getId())) {
-        notificationService.createNotification(
-          u,
-          NotificationType.FOLLOWED_POST,
-          post,
-          null,
-          null,
-          author,
-          null,
-          null
-        );
+    if (!post.isAnonymous()) {
+      // notify followers of author
+      for (User u : subscriptionService.getSubscribers(author.getUsername())) {
+        if (!u.getId().equals(author.getId())) {
+          notificationService.createNotification(
+            u,
+            NotificationType.FOLLOWED_POST,
+            post,
+            null,
+            null,
+            author,
+            null,
+            null
+          );
+        }
       }
+      notificationService.notifyMentions(content, author, post, null);
     }
-    notificationService.notifyMentions(content, author, post, null);
 
     if (post instanceof LotteryPost lp && lp.getEndTime() != null) {
       ScheduledFuture<?> future = taskScheduler.schedule(
@@ -478,82 +499,80 @@ public class PostService {
   @Transactional
   public void finalizeProposal(Long postId) {
     scheduledFinalizations.remove(postId);
-    categoryProposalPostRepository
-      .findById(postId)
-      .ifPresent(cp -> {
-        if (cp.getProposalStatus() != CategoryProposalStatus.PENDING) {
-          return;
-        }
-        int totalParticipants = cp.getParticipants() != null ? cp.getParticipants().size() : 0;
-        int approveVotes = 0;
-        if (cp.getVotes() != null) {
-          approveVotes = cp.getVotes().getOrDefault(0, 0);
-        }
-        boolean quorumMet = totalParticipants >= cp.getQuorum();
-        int approvePercent = totalParticipants > 0 ? (approveVotes * 100) / totalParticipants : 0;
-        boolean thresholdMet = approvePercent >= cp.getApproveThreshold();
-        boolean approved = false;
-        String rejectReason = null;
-        if (quorumMet && thresholdMet) {
-          cp.setProposalStatus(CategoryProposalStatus.APPROVED);
-          approved = true;
+    categoryProposalPostRepository.findById(postId).ifPresent(cp -> {
+      if (cp.getProposalStatus() != CategoryProposalStatus.PENDING) {
+        return;
+      }
+      int totalParticipants = cp.getParticipants() != null ? cp.getParticipants().size() : 0;
+      int approveVotes = 0;
+      if (cp.getVotes() != null) {
+        approveVotes = cp.getVotes().getOrDefault(0, 0);
+      }
+      boolean quorumMet = totalParticipants >= cp.getQuorum();
+      int approvePercent = totalParticipants > 0 ? (approveVotes * 100) / totalParticipants : 0;
+      boolean thresholdMet = approvePercent >= cp.getApproveThreshold();
+      boolean approved = false;
+      String rejectReason = null;
+      if (quorumMet && thresholdMet) {
+        cp.setProposalStatus(CategoryProposalStatus.APPROVED);
+        approved = true;
+      } else {
+        cp.setProposalStatus(CategoryProposalStatus.REJECTED);
+        String reason;
+        if (!quorumMet && !thresholdMet) {
+          reason = "未达到法定人数且赞成率不足";
+        } else if (!quorumMet) {
+          reason = "未达到法定人数";
         } else {
-          cp.setProposalStatus(CategoryProposalStatus.REJECTED);
-          String reason;
-          if (!quorumMet && !thresholdMet) {
-            reason = "未达到法定人数且赞成率不足";
-          } else if (!quorumMet) {
-            reason = "未达到法定人数";
-          } else {
-            reason = "赞成率不足";
-          }
-          cp.setRejectReason(reason);
-          rejectReason = reason;
+          reason = "赞成率不足";
         }
-        cp.setResultSnapshot(
-          "approveVotes=" +
-            approveVotes +
-            ", totalParticipants=" +
-            totalParticipants +
-            ", approvePercent=" +
-            approvePercent
+        cp.setRejectReason(reason);
+        rejectReason = reason;
+      }
+      cp.setResultSnapshot(
+        "approveVotes=" +
+          approveVotes +
+          ", totalParticipants=" +
+          totalParticipants +
+          ", approvePercent=" +
+          approvePercent
+      );
+      categoryProposalPostRepository.save(cp);
+      if (approved) {
+        categoryService.createCategory(cp.getProposedName(), cp.getDescription(), "star", null);
+      }
+      if (cp.getAuthor() != null) {
+        notificationService.createNotification(
+          cp.getAuthor(),
+          NotificationType.CATEGORY_PROPOSAL_RESULT_OWNER,
+          cp,
+          null,
+          approved,
+          null,
+          null,
+          approved ? null : rejectReason
         );
-        categoryProposalPostRepository.save(cp);
-        if (approved) {
-          categoryService.createCategory(cp.getProposedName(), cp.getDescription(), "star", null);
+      }
+      for (User participant : cp.getParticipants()) {
+        if (
+          cp.getAuthor() != null &&
+          java.util.Objects.equals(participant.getId(), cp.getAuthor().getId())
+        ) {
+          continue;
         }
-        if (cp.getAuthor() != null) {
-          notificationService.createNotification(
-            cp.getAuthor(),
-            NotificationType.CATEGORY_PROPOSAL_RESULT_OWNER,
-            cp,
-            null,
-            approved,
-            null,
-            null,
-            approved ? null : rejectReason
-          );
-        }
-        for (User participant : cp.getParticipants()) {
-          if (
-            cp.getAuthor() != null &&
-            java.util.Objects.equals(participant.getId(), cp.getAuthor().getId())
-          ) {
-            continue;
-          }
-          notificationService.createNotification(
-            participant,
-            NotificationType.CATEGORY_PROPOSAL_RESULT_PARTICIPANT,
-            cp,
-            null,
-            approved,
-            null,
-            null,
-            approved ? null : rejectReason
-          );
-        }
-        postChangeLogService.recordVoteResult(cp);
-      });
+        notificationService.createNotification(
+          participant,
+          NotificationType.CATEGORY_PROPOSAL_RESULT_PARTICIPANT,
+          cp,
+          null,
+          approved,
+          null,
+          null,
+          approved ? null : rejectReason
+        );
+      }
+      postChangeLogService.recordVoteResult(cp);
+    });
   }
 
   /**
@@ -655,43 +674,41 @@ public class PostService {
   @Transactional
   public void finalizePoll(Long postId) {
     scheduledFinalizations.remove(postId);
-    pollPostRepository
-      .findById(postId)
-      .ifPresent(pp -> {
-        if (pp instanceof CategoryProposalPost) {
-          return;
-        }
-        if (pp.isResultAnnounced()) {
-          return;
-        }
-        pp.setResultAnnounced(true);
-        pollPostRepository.save(pp);
-        if (pp.getAuthor() != null) {
-          notificationService.createNotification(
-            pp.getAuthor(),
-            NotificationType.POLL_RESULT_OWNER,
-            pp,
-            null,
-            null,
-            null,
-            null,
-            null
-          );
-        }
-        for (User participant : pp.getParticipants()) {
-          notificationService.createNotification(
-            participant,
-            NotificationType.POLL_RESULT_PARTICIPANT,
-            pp,
-            null,
-            null,
-            null,
-            null,
-            null
-          );
-        }
-        postChangeLogService.recordVoteResult(pp);
-      });
+    pollPostRepository.findById(postId).ifPresent(pp -> {
+      if (pp instanceof CategoryProposalPost) {
+        return;
+      }
+      if (pp.isResultAnnounced()) {
+        return;
+      }
+      pp.setResultAnnounced(true);
+      pollPostRepository.save(pp);
+      if (pp.getAuthor() != null) {
+        notificationService.createNotification(
+          pp.getAuthor(),
+          NotificationType.POLL_RESULT_OWNER,
+          pp,
+          null,
+          null,
+          null,
+          null,
+          null
+        );
+      }
+      for (User participant : pp.getParticipants()) {
+        notificationService.createNotification(
+          participant,
+          NotificationType.POLL_RESULT_PARTICIPANT,
+          pp,
+          null,
+          null,
+          null,
+          null,
+          null
+        );
+      }
+      postChangeLogService.recordVoteResult(pp);
+    });
   }
 
   @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
@@ -699,119 +716,99 @@ public class PostService {
   public void finalizeLottery(Long postId) {
     log.info("start to finalizeLottery for {}", postId);
     scheduledFinalizations.remove(postId);
-    lotteryPostRepository
-      .findById(postId)
-      .ifPresent(lp -> {
-        List<User> participants = new ArrayList<>(lp.getParticipants());
-        if (participants.isEmpty()) {
-          return;
+    lotteryPostRepository.findById(postId).ifPresent(lp -> {
+      List<User> participants = new ArrayList<>(lp.getParticipants());
+      if (participants.isEmpty()) {
+        return;
+      }
+      Collections.shuffle(participants);
+      int winnersCount = Math.min(lp.getPrizeCount(), participants.size());
+      java.util.Set<User> winners = new java.util.HashSet<>(participants.subList(0, winnersCount));
+      log.info("winner count {}", winnersCount);
+      lp.setWinners(winners);
+      lotteryPostRepository.save(lp);
+      for (User w : winners) {
+        if (
+          w.getEmail() != null &&
+          !w.getDisabledEmailNotificationTypes().contains(NotificationType.LOTTERY_WIN)
+        ) {
+          try {
+            emailSender.sendEmail(
+              w.getEmail(),
+              "你中奖了",
+              "恭喜你在抽奖贴 \"" + lp.getTitle() + "\" 中获奖"
+            );
+          } catch (EmailSendException e) {
+            log.warn("Failed to send lottery win email to {}: {}", w.getEmail(), e.getMessage());
+          }
         }
-        Collections.shuffle(participants);
-        int winnersCount = Math.min(lp.getPrizeCount(), participants.size());
-        java.util.Set<User> winners = new java.util.HashSet<>(
-          participants.subList(0, winnersCount)
+        notificationService.createNotification(
+          w,
+          NotificationType.LOTTERY_WIN,
+          lp,
+          null,
+          null,
+          lp.getAuthor(),
+          null,
+          null
         );
-        log.info("winner count {}", winnersCount);
-        lp.setWinners(winners);
-        lotteryPostRepository.save(lp);
-        for (User w : winners) {
-          if (
-            w.getEmail() != null &&
-            !w.getDisabledEmailNotificationTypes().contains(NotificationType.LOTTERY_WIN)
-          ) {
-            try {
-              emailSender.sendEmail(
-                w.getEmail(),
-                "你中奖了",
-                "恭喜你在抽奖贴 \"" + lp.getTitle() + "\" 中获奖"
-              );
-            } catch (EmailSendException e) {
-              log.warn("Failed to send lottery win email to {}: {}", w.getEmail(), e.getMessage());
-            }
+        notificationService.sendCustomPush(
+          w,
+          "你中奖了",
+          String.format("%s/posts/%d", websiteUrl, lp.getId())
+        );
+      }
+      if (lp.getAuthor() != null) {
+        if (
+          lp.getAuthor().getEmail() != null &&
+          !lp
+            .getAuthor()
+            .getDisabledEmailNotificationTypes()
+            .contains(NotificationType.LOTTERY_DRAW)
+        ) {
+          try {
+            emailSender.sendEmail(
+              lp.getAuthor().getEmail(),
+              "抽奖已开奖",
+              "您的抽奖贴 \"" + lp.getTitle() + "\" 已开奖"
+            );
+          } catch (EmailSendException e) {
+            log.warn(
+              "Failed to send lottery draw email to {}: {}",
+              lp.getAuthor().getEmail(),
+              e.getMessage()
+            );
           }
-          notificationService.createNotification(
-            w,
-            NotificationType.LOTTERY_WIN,
-            lp,
-            null,
-            null,
-            lp.getAuthor(),
-            null,
-            null
-          );
-          notificationService.sendCustomPush(
-            w,
-            "你中奖了",
-            String.format("%s/posts/%d", websiteUrl, lp.getId())
-          );
         }
-        if (lp.getAuthor() != null) {
-          if (
-            lp.getAuthor().getEmail() != null &&
-            !lp
-              .getAuthor()
-              .getDisabledEmailNotificationTypes()
-              .contains(NotificationType.LOTTERY_DRAW)
-          ) {
-            try {
-              emailSender.sendEmail(
-                lp.getAuthor().getEmail(),
-                "抽奖已开奖",
-                "您的抽奖贴 \"" + lp.getTitle() + "\" 已开奖"
-              );
-            } catch (EmailSendException e) {
-              log.warn(
-                "Failed to send lottery draw email to {}: {}",
-                lp.getAuthor().getEmail(),
-                e.getMessage()
-              );
-            }
-          }
-          notificationService.createNotification(
-            lp.getAuthor(),
-            NotificationType.LOTTERY_DRAW,
-            lp,
-            null,
-            null,
-            null,
-            null,
-            null
-          );
-          notificationService.sendCustomPush(
-            lp.getAuthor(),
-            "抽奖已开奖",
-            String.format("%s/posts/%d", websiteUrl, lp.getId())
-          );
-        }
-        postChangeLogService.recordLotteryResult(lp);
-      });
+        notificationService.createNotification(
+          lp.getAuthor(),
+          NotificationType.LOTTERY_DRAW,
+          lp,
+          null,
+          null,
+          null,
+          null,
+          null
+        );
+        notificationService.sendCustomPush(
+          lp.getAuthor(),
+          "抽奖已开奖",
+          String.format("%s/posts/%d", websiteUrl, lp.getId())
+        );
+      }
+      postChangeLogService.recordLotteryResult(lp);
+    });
   }
 
   @Transactional
   public Post viewPost(Long id, String viewer) {
-    Post post = postRepository
-      .findById(id)
-      .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
-    if (post.getStatus() != PostStatus.PUBLISHED) {
-      if (viewer == null) {
-        throw new com.openisle.exception.NotFoundException("User not found");
-      }
-      User viewerUser = userRepository
-        .findByUsername(viewer)
-        .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
-      if (
-        !viewerUser.getRole().equals(com.openisle.model.Role.ADMIN) &&
-        !viewerUser.getId().equals(post.getAuthor().getId())
-      ) {
-        throw new com.openisle.exception.NotFoundException("Post not found");
-      }
-    }
+    Post post = getViewablePost(id, viewer);
     post.setViews(post.getViews() + 1);
     post = postRepository.save(post);
     if (viewer != null) {
       postReadService.recordRead(viewer, id);
     }
-    if (viewer != null && !viewer.equals(post.getAuthor().getUsername())) {
+    if (viewer != null && !post.isAnonymous() && !viewer.equals(post.getAuthor().getUsername())) {
       User viewerUser = userRepository.findByUsername(viewer).orElse(null);
       if (viewerUser != null) {
         notificationRepository.deleteByTypeAndFromUserAndPost(
@@ -829,6 +826,30 @@ public class PostService {
           null,
           null
         );
+      }
+    }
+    return post;
+  }
+
+  public Post getViewablePost(Long id, String viewer) {
+    Post post = postRepository
+      .findById(id)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
+    boolean publicVisible =
+      post.getStatus() == PostStatus.PUBLISHED &&
+      post.getVisibleScope() == PostVisibleScopeType.ALL;
+    if (!publicVisible) {
+      if (viewer == null) {
+        throw new com.openisle.exception.NotFoundException("Post not found");
+      }
+      User viewerUser = userRepository
+        .findByUsername(viewer)
+        .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+      if (
+        !viewerUser.getRole().equals(com.openisle.model.Role.ADMIN) &&
+        !viewerUser.getId().equals(post.getAuthor().getId())
+      ) {
+        throw new com.openisle.exception.NotFoundException("Post not found");
       }
     }
     return post;
@@ -997,11 +1018,12 @@ public class PostService {
       .findByUsername(username)
       .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
     Pageable pageable = PageRequest.of(0, limit);
-    return postRepository.findByAuthorAndStatusOrderByCreatedAtDesc(
-      user,
-      PostStatus.PUBLISHED,
-      pageable
-    );
+    return postRepository
+      .findByAuthorAndStatusOrderByCreatedAtDesc(user, PostStatus.PUBLISHED, pageable)
+      .stream()
+      .filter(post -> !post.isAnonymous())
+      .filter(post -> post.getVisibleScope() == PostVisibleScopeType.ALL)
+      .toList();
   }
 
   public java.time.LocalDateTime getLastPostTime(String username) {
@@ -1115,8 +1137,40 @@ public class PostService {
     return listPostsByCategories(ids, page, pageSize).stream().collect(Collectors.toList());
   }
 
+  public List<Post> listTreeholeSquare(String username, Integer page, Integer pageSize) {
+    Pageable pageable = buildPageable(page, pageSize);
+    if (StringUtils.isBlank(username)) {
+      return postRepository.findByTypeAndTreeholeReviewStatusAndStatusAndVisibleScopeOrderByCreatedAtDesc(
+        PostType.TREEHOLE,
+        TreeholeReviewStatus.PUBLIC,
+        PostStatus.PUBLISHED,
+        PostVisibleScopeType.ALL,
+        pageable
+      );
+    }
+    User author = userRepository
+      .findByUsername(username)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+    return postRepository.findTreeholeSquareForAuthor(author, pageable);
+  }
+
+  public List<Post> listMyTreeholes(String username, Integer page, Integer pageSize) {
+    User author = userRepository
+      .findByUsername(username)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+    return postRepository.findByAuthorAndTypeOrderByCreatedAtDesc(
+      author,
+      PostType.TREEHOLE,
+      buildPageable(page, pageSize)
+    );
+  }
+
   public List<Post> listPendingPosts() {
-    return postRepository.findByStatus(PostStatus.PENDING);
+    return postRepository
+      .findByStatus(PostStatus.PENDING)
+      .stream()
+      .filter(post -> post.getType() != PostType.TREEHOLE)
+      .toList();
   }
 
   @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
@@ -1124,6 +1178,9 @@ public class PostService {
     Post post = postRepository
       .findById(id)
       .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
+    if (post.getType() == PostType.TREEHOLE) {
+      throw new IllegalArgumentException("Use treehole intervention workflow");
+    }
     // publish all pending tags along with the post
     for (com.openisle.model.Tag tag : post.getTags()) {
       if (!tag.isApproved()) {
@@ -1152,6 +1209,9 @@ public class PostService {
     Post post = postRepository
       .findById(id)
       .orElseThrow(() -> new com.openisle.exception.NotFoundException("Post not found"));
+    if (post.getType() == PostType.TREEHOLE) {
+      throw new IllegalArgumentException("Use treehole intervention workflow");
+    }
     // remove user created tags that are only linked to this post
     java.util.Set<com.openisle.model.Tag> tags = new java.util.HashSet<>(post.getTags());
     for (com.openisle.model.Tag tag : tags) {
@@ -1292,7 +1352,9 @@ public class PostService {
     post.setVisibleScope(postVisibleScopeType);
     Post updated = postRepository.save(post);
     imageUploader.adjustReferences(oldContent, content);
-    notificationService.notifyMentions(content, user, updated, null);
+    if (!updated.isAnonymous()) {
+      notificationService.notifyMentions(content, user, updated, null);
+    }
     if (!java.util.Objects.equals(oldTitle, title)) {
       postChangeLogService.recordTitleChange(updated, user, oldTitle, title);
     }
@@ -1377,6 +1439,7 @@ public class PostService {
     }
     String title = post.getTitle();
     Long postId = post.getId();
+    deleteTreeholeInterventionData(post);
     postChangeLogService.deleteLogsForPost(post);
     postRepository.delete(post);
     searchIndexEventPublisher.publishPostDeleted(postId);
@@ -1535,13 +1598,10 @@ public class PostService {
         java.util.Comparator.comparing(
           Post::getPinnedAt,
           java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
-        ).thenComparing(
-          p -> {
-            java.time.LocalDateTime t = commentRepository.findLastCommentTime(p);
-            return t != null ? t : p.getCreatedAt();
-          },
-          java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
-        )
+        ).thenComparing(p -> {
+          java.time.LocalDateTime t = commentRepository.findLastCommentTime(p);
+          return t != null ? t : p.getCreatedAt();
+        }, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))
       )
       .toList();
   }
@@ -1565,5 +1625,56 @@ public class PostService {
     // 这里必须将list包装为arrayList类型，否则序列化会有问题
     // list.sublist返回的是内部类
     return new ArrayList<>(posts.subList(from, to));
+  }
+
+  private void initializeTreeholeState(Post post, TreeholeExpectedVisibility requestedVisibility) {
+    TreeholeExpectedVisibility expectedVisibility =
+      requestedVisibility != null ? requestedVisibility : TreeholeExpectedVisibility.ONLY_ME;
+    post.setAnonymous(true);
+    post.setVisibleScope(PostVisibleScopeType.ONLY_ME);
+    post.setStatus(PostStatus.PENDING);
+    post.setTreeholeExpectedVisibility(expectedVisibility);
+    post.setTreeholeReviewStatus(
+      expectedVisibility == TreeholeExpectedVisibility.PUBLIC
+        ? TreeholeReviewStatus.AI_REVIEWING
+        : TreeholeReviewStatus.PRIVATE
+    );
+  }
+
+  private boolean isInitialTreeholeReviewState(Post post) {
+    return (
+      post.getType() == PostType.TREEHOLE &&
+      (post.getTreeholeReviewStatus() == TreeholeReviewStatus.AI_REVIEWING ||
+        post.getTreeholeReviewStatus() == TreeholeReviewStatus.PRIVATE)
+    );
+  }
+
+  private void publishTreeholeReviewRequested(
+    Post post,
+    ModerationService.ModerationResult moderation
+  ) {
+    applicationContext.publishEvent(
+      new TreeholeReviewRequestedEvent(
+        post.getId(),
+        post.getAuthor() != null ? post.getAuthor().getId() : null,
+        post.getTreeholeExpectedVisibility(),
+        post.getTreeholeReviewStatus(),
+        moderation.flagged(),
+        moderation.crisis(),
+        moderation.matchedWord()
+      )
+    );
+  }
+
+  private void deleteTreeholeInterventionData(Post post) {
+    if (post.getType() != PostType.TREEHOLE || post.getId() == null) {
+      return;
+    }
+    applicationContext
+      .getBean(TreeholeInterventionRecordRepository.class)
+      .deleteByPost_Id(post.getId());
+    applicationContext
+      .getBean(TreeholeInterventionCaseRepository.class)
+      .deleteByPost_Id(post.getId());
   }
 }

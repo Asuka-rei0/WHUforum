@@ -9,6 +9,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class OpenIsleApplication {
 
   public static void main(String[] args) {
+    System.setProperty("jdk.tls.client.protocols", "TLSv1.2");
+    System.setProperty("https.protocols", "TLSv1.2");
     SpringApplication.run(OpenIsleApplication.class, args);
   }
 }

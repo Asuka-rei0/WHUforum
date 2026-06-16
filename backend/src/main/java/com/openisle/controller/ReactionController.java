@@ -3,11 +3,15 @@ package com.openisle.controller;
 import com.openisle.dto.ReactionDto;
 import com.openisle.dto.ReactionRequest;
 import com.openisle.mapper.ReactionMapper;
+import com.openisle.model.Comment;
+import com.openisle.model.Post;
 import com.openisle.model.Reaction;
 import com.openisle.model.ReactionType;
 import com.openisle.service.LevelService;
 import com.openisle.service.PointService;
 import com.openisle.service.ReactionService;
+import com.openisle.service.CommentService;
+import com.openisle.service.PostService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -27,6 +31,8 @@ public class ReactionController {
   private final LevelService levelService;
   private final ReactionMapper reactionMapper;
   private final PointService pointService;
+  private final PostService postService;
+  private final CommentService commentService;
 
   /**
    * Get all available reaction types.
@@ -55,12 +61,13 @@ public class ReactionController {
     @RequestBody ReactionRequest req,
     Authentication auth
   ) {
+    Post post = postService.getViewablePost(postId, auth.getName());
     Reaction reaction = reactionService.reactToPost(auth.getName(), postId, req.getType());
     if (reaction == null) {
       pointService.deductForReactionOfPost(auth.getName(), postId);
       return ResponseEntity.noContent().build();
     }
-    ReactionDto dto = reactionMapper.toDto(reaction);
+    ReactionDto dto = reactionMapper.toDto(reaction, auth.getName(), post.isAnonymous());
     dto.setReward(levelService.awardForReaction(auth.getName()));
     pointService.awardForReactionOfPost(auth.getName(), postId);
     return ResponseEntity.ok(dto);
@@ -79,12 +86,18 @@ public class ReactionController {
     @RequestBody ReactionRequest req,
     Authentication auth
   ) {
+    Comment comment = commentService.getComment(commentId);
+    Post post = postService.getViewablePost(comment.getPost().getId(), auth.getName());
     Reaction reaction = reactionService.reactToComment(auth.getName(), commentId, req.getType());
     if (reaction == null) {
       pointService.deductForReactionOfComment(auth.getName(), commentId);
       return ResponseEntity.noContent().build();
     }
-    ReactionDto dto = reactionMapper.toDto(reaction);
+    ReactionDto dto = reactionMapper.toDto(
+      reaction,
+      auth.getName(),
+      post.isAnonymous() || comment.isAnonymous()
+    );
     dto.setReward(levelService.awardForReaction(auth.getName()));
     pointService.awardForReactionOfComment(auth.getName(), commentId);
     return ResponseEntity.ok(dto);

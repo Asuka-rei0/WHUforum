@@ -7,6 +7,8 @@ import com.openisle.model.CommentSort;
 import com.openisle.model.NotificationType;
 import com.openisle.model.PointHistory;
 import com.openisle.model.Post;
+import com.openisle.model.PostStatus;
+import com.openisle.model.PostVisibleScopeType;
 import com.openisle.model.Role;
 import com.openisle.model.User;
 import com.openisle.repository.CommentRepository;
@@ -124,35 +126,39 @@ public class CommentService {
         null
       );
     }
-    for (User u : subscriptionService.getPostSubscribers(postId)) {
-      if (!u.getId().equals(author.getId())) {
-        notificationService.createNotification(
-          u,
-          NotificationType.POST_UPDATED,
-          post,
-          comment,
-          null,
-          null,
-          null,
-          null
-        );
+    if (!post.isAnonymous()) {
+      for (User u : subscriptionService.getPostSubscribers(postId)) {
+        if (!u.getId().equals(author.getId())) {
+          notificationService.createNotification(
+            u,
+            NotificationType.POST_UPDATED,
+            post,
+            comment,
+            null,
+            null,
+            null,
+            null
+          );
+        }
       }
     }
-    for (User u : subscriptionService.getSubscribers(author.getUsername())) {
-      if (!u.getId().equals(author.getId())) {
-        notificationService.createNotification(
-          u,
-          NotificationType.USER_ACTIVITY,
-          post,
-          comment,
-          null,
-          null,
-          null,
-          null
-        );
+    if (!comment.isAnonymous()) {
+      for (User u : subscriptionService.getSubscribers(author.getUsername())) {
+        if (!u.getId().equals(author.getId())) {
+          notificationService.createNotification(
+            u,
+            NotificationType.USER_ACTIVITY,
+            post,
+            comment,
+            null,
+            null,
+            null,
+            null
+          );
+        }
       }
+      notificationService.notifyMentions(content, author, post, comment);
     }
-    notificationService.notifyMentions(content, author, post, comment);
     if (moderation.crisis()) {
       notifyModerationAdmins(author, post, comment, moderation);
     }
@@ -221,11 +227,16 @@ public class CommentService {
     updatePostCommentStats(parent.getPost());
 
     imageUploader.addReferences(imageUploader.extractUrls(content));
-    if (!author.getId().equals(parent.getAuthor().getId())) {
+    Post post = parent.getPost();
+    boolean parentAuthorCanView =
+      !post.isAnonymous() ||
+      isPubliclyVisible(post) ||
+      parent.getAuthor().getId().equals(post.getAuthor().getId());
+    if (!author.getId().equals(parent.getAuthor().getId()) && parentAuthorCanView) {
       notificationService.createNotification(
         parent.getAuthor(),
         NotificationType.COMMENT_REPLY,
-        parent.getPost(),
+        post,
         comment,
         null,
         null,
@@ -233,49 +244,53 @@ public class CommentService {
         null
       );
     }
-    for (User u : subscriptionService.getCommentSubscribers(parentId)) {
-      if (!u.getId().equals(author.getId())) {
-        notificationService.createNotification(
-          u,
-          NotificationType.COMMENT_REPLY,
-          parent.getPost(),
-          comment,
-          null,
-          null,
-          null,
-          null
-        );
+    if (!post.isAnonymous()) {
+      for (User u : subscriptionService.getCommentSubscribers(parentId)) {
+        if (!u.getId().equals(author.getId())) {
+          notificationService.createNotification(
+            u,
+            NotificationType.COMMENT_REPLY,
+            post,
+            comment,
+            null,
+            null,
+            null,
+            null
+          );
+        }
+      }
+      for (User u : subscriptionService.getPostSubscribers(post.getId())) {
+        if (!u.getId().equals(author.getId())) {
+          notificationService.createNotification(
+            u,
+            NotificationType.POST_UPDATED,
+            post,
+            comment,
+            null,
+            null,
+            null,
+            null
+          );
+        }
       }
     }
-    for (User u : subscriptionService.getPostSubscribers(parent.getPost().getId())) {
-      if (!u.getId().equals(author.getId())) {
-        notificationService.createNotification(
-          u,
-          NotificationType.POST_UPDATED,
-          parent.getPost(),
-          comment,
-          null,
-          null,
-          null,
-          null
-        );
+    if (!comment.isAnonymous()) {
+      for (User u : subscriptionService.getSubscribers(author.getUsername())) {
+        if (!u.getId().equals(author.getId())) {
+          notificationService.createNotification(
+            u,
+            NotificationType.USER_ACTIVITY,
+            post,
+            comment,
+            null,
+            null,
+            null,
+            null
+          );
+        }
       }
+      notificationService.notifyMentions(content, author, post, comment);
     }
-    for (User u : subscriptionService.getSubscribers(author.getUsername())) {
-      if (!u.getId().equals(author.getId())) {
-        notificationService.createNotification(
-          u,
-          NotificationType.USER_ACTIVITY,
-          parent.getPost(),
-          comment,
-          null,
-          null,
-          null,
-          null
-        );
-      }
-    }
-    notificationService.notifyMentions(content, author, parent.getPost(), comment);
     if (moderation.crisis()) {
       notifyModerationAdmins(author, parent.getPost(), comment, moderation);
     }
@@ -369,7 +384,10 @@ public class CommentService {
       .findByUsername(username)
       .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
     Pageable pageable = PageRequest.of(0, limit);
-    List<Comment> comments = commentRepository.findByAuthorOrderByCreatedAtDesc(user, pageable);
+    List<Comment> comments = commentRepository.findPublicNonAnonymousByAuthorOrderByCreatedAtDesc(
+      user,
+      pageable
+    );
     log.debug(
       "getRecentCommentsByUser returning {} comments for user {}",
       comments.size(),
@@ -590,6 +608,13 @@ public class CommentService {
     int reactions = reactionRepository.findByComment(comment).size();
     int replies = commentRepository.findByParentOrderByCreatedAtAsc(comment).size();
     return reactions + replies;
+  }
+
+  private boolean isPubliclyVisible(Post post) {
+    return (
+      post.getStatus() == PostStatus.PUBLISHED &&
+      post.getVisibleScope() == PostVisibleScopeType.ALL
+    );
   }
 
   /**

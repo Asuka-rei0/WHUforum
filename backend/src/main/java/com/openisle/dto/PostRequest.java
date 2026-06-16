@@ -2,6 +2,7 @@ package com.openisle.dto;
 
 import com.openisle.model.PostType;
 import com.openisle.model.PostVisibleScopeType;
+import com.openisle.model.TreeholeExpectedVisibility;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,6 +23,7 @@ public class PostRequest {
   // optional for lottery posts
   private PostType type;
   private PostVisibleScopeType postVisibleScopeType;
+  private TreeholeExpectedVisibility treeholeExpectedVisibility;
   private String prizeDescription;
   private String prizeIcon;
   private Integer prizeCount;

@@ -117,14 +117,13 @@ import DropdownMenu from '~/components/DropdownMenu.vue'
 import ToolTip from '~/components/ToolTip.vue'
 import SearchDropdown from '~/components/SearchDropdown.vue'
 import BaseUserAvatar from '~/components/BaseUserAvatar.vue'
-import { authState, clearToken } from '~/utils/auth'
+import { authState, clearToken, getToken, loadCurrentUser } from '~/utils/auth'
 import { useUnreadCount } from '~/composables/useUnreadCount'
 import { useChannelsUnreadCount } from '~/composables/useChannelsUnreadCount'
 import { useIsMobile } from '~/utils/screen'
 import { themeState, cycleTheme, ThemeMode } from '~/utils/theme'
 import { toast } from '~/main'
 import { getApiErrorMessage } from '~/utils/apiError'
-import { getToken } from '~/utils/auth'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
 const WEBSITE_BASE_URL = config.public.websiteBaseUrl
@@ -147,9 +146,16 @@ const menuBtn = ref(null)
 const isCopying = ref(false)
 const onlineCount = ref(0)
 
+const ensureCurrentUser = async () => {
+  if (!getToken()) return null
+  if (authState.userId && authState.username) return authState
+  return await loadCurrentUser()
+}
+
 // 心跳检测
 async function sendPing() {
   try {
+    await ensureCurrentUser()
     // 已登录就用 userId，否则随机生成游客ID
     let userId = authState.userId
     if (userId) {
@@ -249,10 +255,14 @@ const copyRssLink = async () => {
 }
 
 const goToProfile = async () => {
-  let id = authState.username || authState.id
+  await ensureCurrentUser()
+  let id = authState.userId || authState.username
   if (id) {
     navigateTo(`/users/${id}`, { replace: true })
   }
+}
+const goToMyTreeholes = () => {
+  navigateTo('/treehole/mine', { replace: true })
 }
 const goToSignup = () => {
   navigateTo('/signup', { replace: true })
@@ -277,6 +287,7 @@ const goToMessages = () => {
 const headerMenuItems = computed(() => [
   { text: '设置', onClick: goToSettings },
   { text: '个人主页', onClick: goToProfile },
+  { text: '我的树洞', onClick: goToMyTreeholes },
   { text: '退出', onClick: goToLogout },
 ])
 
@@ -293,6 +304,8 @@ const iconClass = computed(() => {
 })
 
 onMounted(async () => {
+  await ensureCurrentUser()
+
   const updateUnread = async () => {
     if (authState.loggedIn) {
       fetchUnreadCount()
@@ -305,8 +318,8 @@ onMounted(async () => {
   await updateUnread()
 
   // 新增的在线人数逻辑
-  sendPing()
-  fetchCount()
+  await sendPing()
+  await fetchCount()
   setInterval(sendPing, 120000) // 每 2 分钟发一次心跳
   setInterval(fetchCount, 60000) // 每 1 分更新 UI
 })

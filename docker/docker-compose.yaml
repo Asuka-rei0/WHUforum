@@ -147,8 +147,9 @@ services:
       MYSQL_PORT: 3306
       REDIS_PORT: 6379
       JAVA_OPTS: "-Duser.timezone=Asia/Shanghai"
+      JAVA_TOOL_OPTIONS: "-Djdk.tls.client.protocols=TLSv1.2 -Dhttps.protocols=TLSv1.2"
     ports:
-      - "${SERVER_PORT:-8080}:${SERVER_PORT:-8080}"
+      - "${BACKEND_HOST_PORT:-8080}:${SERVER_PORT:-8080}"
     volumes:
       - ../backend:/app
       - maven-repo:/root/.m2

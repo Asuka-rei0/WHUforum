@@ -47,7 +47,14 @@ public class PostMapper {
 
   public PostSummaryDto toSummaryDto(Post post) {
     PostSummaryDto dto = new PostSummaryDto();
-    applyCommon(post, dto);
+    applyCommon(post, dto, null);
+    return dto;
+  }
+
+  public PostSummaryDto toAdminSummaryDto(Post post) {
+    PostSummaryDto dto = new PostSummaryDto();
+    applyListFields(post, dto);
+    applyInternalTreeholeReviewFields(post, dto);
     return dto;
   }
 
@@ -89,12 +96,12 @@ public class PostMapper {
 
   public PostDetailDto toDetailDto(Post post, String viewer) {
     PostDetailDto dto = new PostDetailDto();
-    applyCommon(post, dto);
+    applyCommon(post, dto, viewer);
     dto.setOwnedByCurrentUser(isOwnedBy(post, viewer));
     List<CommentDto> comments = commentService
       .getCommentsForPost(post.getId(), CommentSort.OLDEST)
       .stream()
-      .map(commentMapper::toDtoWithReplies)
+      .map(comment -> commentMapper.toDtoWithReplies(comment, viewer, post.isAnonymous()))
       .collect(Collectors.toList());
     dto.setComments(comments);
     dto.setSubscribed(viewer != null && subscriptionService.isPostSubscribed(viewer, post.getId()));
@@ -122,6 +129,8 @@ public class PostMapper {
     dto.setClosed(post.isClosed());
     dto.setVisibleScope(post.getVisibleScope());
     dto.setType(post.getType());
+    dto.setTreeholeExpectedVisibility(post.getTreeholeExpectedVisibility());
+    dto.setTreeholeReviewStatus(post.getTreeholeReviewStatus());
     dto.setAnonymous(post.isAnonymous());
     dto.setAnonymousAlias(post.getAnonymousAlias());
     fleaMarketItemRepository
@@ -129,7 +138,7 @@ public class PostMapper {
       .ifPresent(item -> dto.setFleaMarketItem(toFleaDto(item)));
   }
 
-  private void applyCommon(Post post, PostSummaryDto dto) {
+  private void applyCommon(Post post, PostSummaryDto dto, String viewer) {
     dto.setId(post.getId());
     dto.setTitle(post.getTitle());
     dto.setContent(post.getContent());
@@ -148,6 +157,8 @@ public class PostMapper {
     dto.setRssExcluded(post.getRssExcluded() == null || post.getRssExcluded());
     dto.setClosed(post.isClosed());
     dto.setVisibleScope(post.getVisibleScope());
+    dto.setTreeholeExpectedVisibility(post.getTreeholeExpectedVisibility());
+    dto.setTreeholeReviewStatus(post.getTreeholeReviewStatus());
     dto.setAnonymous(post.isAnonymous());
     dto.setAnonymousAlias(post.getAnonymousAlias());
     fleaMarketItemRepository
@@ -157,14 +168,18 @@ public class PostMapper {
     List<ReactionDto> reactions = reactionService
       .getReactionsForPost(post.getId())
       .stream()
-      .map(reactionMapper::toDto)
+      .map(reaction -> reactionMapper.toDto(reaction, viewer, post.isAnonymous()))
       .collect(Collectors.toList());
     dto.setReactions(reactions);
 
     List<User> participants = commentService.getParticipants(post.getId(), 5);
-    dto.setParticipants(
-      participants.stream().map(userMapper::toAuthorDto).collect(Collectors.toList())
-    );
+    if (post.isAnonymous()) {
+      dto.setParticipants(List.of(userMapper.toAnonymousAuthorDto(post.getAnonymousAlias())));
+    } else {
+      dto.setParticipants(
+        participants.stream().map(userMapper::toAuthorDto).collect(Collectors.toList())
+      );
+    }
 
     LocalDateTime last = post.getLastReplyAt();
     if (last == null) {
@@ -228,6 +243,13 @@ public class PostMapper {
     target.setOptionParticipants(optionParticipants);
     target.setMultiple(Boolean.TRUE.equals(pollPost.getMultiple()));
     return target;
+  }
+
+  private void applyInternalTreeholeReviewFields(Post post, PostSummaryDto dto) {
+    dto.setTreeholeRiskLevel(post.getTreeholeRiskLevel());
+    dto.setTreeholeRiskReason(post.getTreeholeRiskReason());
+    dto.setTreeholeRecommendedAction(post.getTreeholeRecommendedAction());
+    dto.setTreeholeReviewedAt(post.getTreeholeReviewedAt());
   }
 
   private com.openisle.dto.FleaMarketItemDto toFleaDto(FleaMarketItem item) {

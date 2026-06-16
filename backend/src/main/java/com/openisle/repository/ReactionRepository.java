@@ -39,12 +39,25 @@ public interface ReactionRepository extends JpaRepository<Reaction, Long> {
   void deleteByComment_IdIn(@Param("commentIds") Collection<Long> commentIds);
 
   @Query(
-    "SELECT r.post.id FROM Reaction r WHERE r.post IS NOT NULL AND r.post.author.username = :username AND r.type = com.openisle.model.ReactionType.LIKE GROUP BY r.post.id ORDER BY COUNT(r.id) DESC"
+    "SELECT r.post.id FROM Reaction r WHERE r.post IS NOT NULL " +
+    "AND r.post.author.username = :username " +
+    "AND r.post.anonymous = false " +
+    "AND r.post.status = com.openisle.model.PostStatus.PUBLISHED " +
+    "AND r.post.visibleScope = com.openisle.model.PostVisibleScopeType.ALL " +
+    "AND r.type = com.openisle.model.ReactionType.LIKE " +
+    "GROUP BY r.post.id ORDER BY COUNT(r.id) DESC"
   )
   List<Long> findTopPostIds(@Param("username") String username, Pageable pageable);
 
   @Query(
-    "SELECT r.comment.id FROM Reaction r WHERE r.comment IS NOT NULL AND r.comment.author.username = :username AND r.type = com.openisle.model.ReactionType.LIKE GROUP BY r.comment.id ORDER BY COUNT(r.id) DESC"
+    "SELECT r.comment.id FROM Reaction r WHERE r.comment IS NOT NULL " +
+    "AND r.comment.author.username = :username " +
+    "AND r.comment.anonymous = false " +
+    "AND r.comment.post.anonymous = false " +
+    "AND r.comment.post.status = com.openisle.model.PostStatus.PUBLISHED " +
+    "AND r.comment.post.visibleScope = com.openisle.model.PostVisibleScopeType.ALL " +
+    "AND r.type = com.openisle.model.ReactionType.LIKE " +
+    "GROUP BY r.comment.id ORDER BY COUNT(r.id) DESC"
   )
   List<Long> findTopCommentIds(@Param("username") String username, Pageable pageable);
 
@@ -71,8 +84,17 @@ public interface ReactionRepository extends JpaRepository<Reaction, Long> {
     LEFT JOIN c.author  ca
     WHERE r.type = com.openisle.model.ReactionType.LIKE
       AND (
-           (r.post    IS NOT NULL AND pa.username = :username)
-        OR (r.comment IS NOT NULL AND ca.username = :username)
+           (r.post IS NOT NULL
+             AND pa.username = :username
+             AND p.anonymous = false
+             AND p.status = com.openisle.model.PostStatus.PUBLISHED
+             AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL)
+        OR (r.comment IS NOT NULL
+             AND ca.username = :username
+             AND c.anonymous = false
+             AND c.post.anonymous = false
+             AND c.post.status = com.openisle.model.PostStatus.PUBLISHED
+             AND c.post.visibleScope = com.openisle.model.PostVisibleScopeType.ALL)
       )
     """
   )
@@ -83,8 +105,17 @@ public interface ReactionRepository extends JpaRepository<Reaction, Long> {
     SELECT COUNT(r) FROM Reaction r
     LEFT JOIN r.post p
     LEFT JOIN r.comment c
-    WHERE (p IS NOT NULL AND p.author.username = :username) OR
-          (c IS NOT NULL AND c.author.username = :username)
+    WHERE (p IS NOT NULL
+             AND p.author.username = :username
+             AND p.anonymous = false
+             AND p.status = com.openisle.model.PostStatus.PUBLISHED
+             AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL)
+       OR (c IS NOT NULL
+             AND c.author.username = :username
+             AND c.anonymous = false
+             AND c.post.anonymous = false
+             AND c.post.status = com.openisle.model.PostStatus.PUBLISHED
+             AND c.post.visibleScope = com.openisle.model.PostVisibleScopeType.ALL)
     """
   )
   long countReceived(@Param("username") String username);

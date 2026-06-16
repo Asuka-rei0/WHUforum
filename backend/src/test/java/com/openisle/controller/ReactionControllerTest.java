@@ -13,8 +13,10 @@ import com.openisle.model.Post;
 import com.openisle.model.Reaction;
 import com.openisle.model.ReactionType;
 import com.openisle.model.User;
+import com.openisle.service.CommentService;
 import com.openisle.service.LevelService;
 import com.openisle.service.PointService;
+import com.openisle.service.PostService;
 import com.openisle.service.ReactionService;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -43,6 +45,12 @@ class ReactionControllerTest {
   @MockBean
   private PointService pointService;
 
+  @MockBean
+  private PostService postService;
+
+  @MockBean
+  private CommentService commentService;
+
   @Test
   void reactToPost() throws Exception {
     User user = new User();
@@ -54,6 +62,7 @@ class ReactionControllerTest {
     reaction.setUser(user);
     reaction.setPost(post);
     reaction.setType(ReactionType.LIKE);
+    Mockito.when(postService.getViewablePost(1L, "u1")).thenReturn(post);
     Mockito.when(reactionService.reactToPost(eq("u1"), eq(1L), eq(ReactionType.LIKE))).thenReturn(
       reaction
     );
@@ -73,13 +82,18 @@ class ReactionControllerTest {
   void reactToComment() throws Exception {
     User user = new User();
     user.setUsername("u2");
+    Post post = new Post();
+    post.setId(1L);
     Comment comment = new Comment();
     comment.setId(2L);
+    comment.setPost(post);
     Reaction reaction = new Reaction();
     reaction.setId(2L);
     reaction.setUser(user);
     reaction.setComment(comment);
     reaction.setType(ReactionType.RECOMMEND);
+    Mockito.when(commentService.getComment(2L)).thenReturn(comment);
+    Mockito.when(postService.getViewablePost(1L, "u2")).thenReturn(post);
     Mockito.when(
       reactionService.reactToComment(eq("u2"), eq(2L), eq(ReactionType.RECOMMEND))
     ).thenReturn(reaction);

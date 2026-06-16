@@ -19,6 +19,7 @@ import com.openisle.service.CommentService;
 import com.openisle.service.LevelService;
 import com.openisle.service.PointService;
 import com.openisle.service.PostChangeLogService;
+import com.openisle.service.PostService;
 import com.openisle.service.ReactionService;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -65,15 +66,20 @@ class CommentControllerTest {
   @MockBean
   private PostMapper postMapper;
 
+  @MockBean
+  private PostService postService;
+
   private Comment createComment(Long id, String content, String authorName) {
     User user = new User();
     user.setUsername(authorName);
+    Post post = new Post();
+    post.setId(1L);
     Comment c = new Comment();
     c.setId(id);
     c.setContent(content);
     c.setCreatedAt(LocalDateTime.now());
     c.setAuthor(user);
-    c.setPost(new Post());
+    c.setPost(post);
     return c;
   }
 
@@ -87,11 +93,13 @@ class CommentControllerTest {
     Mockito.when(changeLogService.listLogs(1L)).thenReturn(List.of());
     Mockito.when(commentService.getReplies(1L)).thenReturn(List.of());
     Mockito.when(reactionService.getReactionsForComment(1L)).thenReturn(List.of());
+    Mockito.when(postService.getViewablePost(1L, "bob")).thenReturn(comment.getPost());
+    Mockito.when(postService.getViewablePost(1L, null)).thenReturn(comment.getPost());
     CommentDto dto = new CommentDto();
     dto.setId(comment.getId());
     dto.setContent(comment.getContent());
-    Mockito.when(commentMapper.toDto(comment)).thenReturn(dto);
-    Mockito.when(commentMapper.toDtoWithReplies(comment)).thenReturn(dto);
+    Mockito.when(commentMapper.toDto(comment, "bob", false)).thenReturn(dto);
+    Mockito.when(commentMapper.toDtoWithReplies(comment, null, false)).thenReturn(dto);
 
     mockMvc
       .perform(
@@ -111,14 +119,17 @@ class CommentControllerTest {
 
   @Test
   void replyComment() throws Exception {
+    Comment parent = createComment(1L, "hi", "bob");
     Comment reply = createComment(2L, "re", "alice");
+    Mockito.when(commentService.getComment(1L)).thenReturn(parent);
+    Mockito.when(postService.getViewablePost(1L, "alice")).thenReturn(parent.getPost());
     Mockito.when(commentService.addReply(eq("alice"), eq(1L), eq("re"), eq(false))).thenReturn(
       reply
     );
     CommentDto dto = new CommentDto();
     dto.setId(reply.getId());
     dto.setContent(reply.getContent());
-    Mockito.when(commentMapper.toDto(reply)).thenReturn(dto);
+    Mockito.when(commentMapper.toDto(reply, "alice", false)).thenReturn(dto);
 
     mockMvc
       .perform(

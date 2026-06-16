@@ -72,7 +72,7 @@ public class SearchService {
   }
 
   public List<Comment> searchComments(String keyword) {
-    return commentRepository.findByContentContainingIgnoreCase(keyword);
+    return commentRepository.findPublicNonAnonymousByContentContainingIgnoreCase(keyword);
   }
 
   public List<Category> searchCategories(String keyword) {
