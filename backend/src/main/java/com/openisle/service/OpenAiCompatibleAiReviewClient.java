@@ -3,21 +3,12 @@ package com.openisle.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.openisle.model.TreeholeRiskLevel;
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.InetAddress;
-import java.net.Socket;
-import java.security.GeneralSecurityException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
-import javax.net.ssl.SSLSocket;
-import javax.net.ssl.SSLSocketFactory;
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -26,11 +17,14 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestTemplate;
 
 @Service
-@RequiredArgsConstructor
 public class OpenAiCompatibleAiReviewClient implements AiReviewClient {
+
+  private static final int MAX_TRANSPORT_ATTEMPTS = 3;
+  private static final long RETRY_BACKOFF_MILLIS = 800;
 
   static {
     // DeepSeek's current edge can close Java 17 TLS 1.3 POST handshakes; TLS 1.2 is verified.
@@ -39,7 +33,23 @@ public class OpenAiCompatibleAiReviewClient implements AiReviewClient {
   }
 
   private final ObjectMapper objectMapper;
-  private final RestTemplate restTemplate = new RestTemplate(treeholeAiRequestFactory());
+  private final RestTemplate restTemplate;
+  private final long retryBackoffMillis;
+
+  @Autowired
+  public OpenAiCompatibleAiReviewClient(ObjectMapper objectMapper) {
+    this(objectMapper, new RestTemplate(treeholeAiRequestFactory()), RETRY_BACKOFF_MILLIS);
+  }
+
+  OpenAiCompatibleAiReviewClient(
+    ObjectMapper objectMapper,
+    RestTemplate restTemplate,
+    long retryBackoffMillis
+  ) {
+    this.objectMapper = objectMapper;
+    this.restTemplate = restTemplate;
+    this.retryBackoffMillis = retryBackoffMillis;
+  }
 
   @Value("${app.treehole.ai-review.api-key:}")
   private String apiKey;
@@ -65,14 +75,38 @@ public class OpenAiCompatibleAiReviewClient implements AiReviewClient {
     body.put("temperature", 0);
     body.put("messages", buildMessages(request));
 
-    ResponseEntity<Map> response = restTemplate.exchange(
-      chatCompletionsUrl(),
-      HttpMethod.POST,
-      new HttpEntity<>(body, headers),
-      Map.class
-    );
+    ResponseEntity<Map> response = exchangeWithTransportRetry(new HttpEntity<>(body, headers));
     String content = extractContent(response.getBody());
     return parseReviewResult(content);
+  }
+
+  private ResponseEntity<Map> exchangeWithTransportRetry(HttpEntity<Map<String, Object>> request) {
+    ResourceAccessException lastException = null;
+    for (int attempt = 1; attempt <= MAX_TRANSPORT_ATTEMPTS; attempt++) {
+      try {
+        return restTemplate.exchange(chatCompletionsUrl(), HttpMethod.POST, request, Map.class);
+      } catch (ResourceAccessException e) {
+        lastException = e;
+        if (attempt == MAX_TRANSPORT_ATTEMPTS) {
+          throw e;
+        }
+        sleepBeforeRetry(attempt);
+      }
+    }
+    throw lastException;
+  }
+
+  private void sleepBeforeRetry(int attempt) {
+    long delayMillis = retryBackoffMillis * attempt;
+    if (delayMillis <= 0) {
+      return;
+    }
+    try {
+      Thread.sleep(delayMillis);
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new IllegalStateException("Interrupted while retrying AI review request", e);
+    }
   }
 
   String chatCompletionsUrl() {
@@ -184,93 +218,9 @@ public class OpenAiCompatibleAiReviewClient implements AiReviewClient {
   }
 
   private static SimpleClientHttpRequestFactory treeholeAiRequestFactory() {
-    Tls12RequestFactory factory = new Tls12RequestFactory();
+    SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
     factory.setConnectTimeout(10000);
     factory.setReadTimeout(30000);
     return factory;
-  }
-
-  private static final class Tls12RequestFactory extends SimpleClientHttpRequestFactory {
-
-    private final SSLSocketFactory sslSocketFactory = createTls12SocketFactory();
-
-    @Override
-    protected void prepareConnection(HttpURLConnection connection, String httpMethod)
-      throws IOException {
-      if (connection instanceof HttpsURLConnection httpsConnection) {
-        httpsConnection.setSSLSocketFactory(sslSocketFactory);
-      }
-      super.prepareConnection(connection, httpMethod);
-    }
-  }
-
-  private static SSLSocketFactory createTls12SocketFactory() {
-    try {
-      SSLContext context = SSLContext.getInstance("TLS");
-      context.init(null, null, null);
-      return new Tls12SocketFactory(context.getSocketFactory());
-    } catch (GeneralSecurityException e) {
-      throw new IllegalStateException("Unable to initialize TLSv1.2 context", e);
-    }
-  }
-
-  private static final class Tls12SocketFactory extends SSLSocketFactory {
-
-    private static final String[] TLS12_ONLY = { "TLSv1.2" };
-
-    private final SSLSocketFactory delegate;
-
-    private Tls12SocketFactory(SSLSocketFactory delegate) {
-      this.delegate = delegate;
-    }
-
-    @Override
-    public String[] getDefaultCipherSuites() {
-      return delegate.getDefaultCipherSuites();
-    }
-
-    @Override
-    public String[] getSupportedCipherSuites() {
-      return delegate.getSupportedCipherSuites();
-    }
-
-    @Override
-    public Socket createSocket(Socket socket, String host, int port, boolean autoClose)
-      throws IOException {
-      return enforceTls12(delegate.createSocket(socket, host, port, autoClose));
-    }
-
-    @Override
-    public Socket createSocket(String host, int port) throws IOException {
-      return enforceTls12(delegate.createSocket(host, port));
-    }
-
-    @Override
-    public Socket createSocket(String host, int port, InetAddress localHost, int localPort)
-      throws IOException {
-      return enforceTls12(delegate.createSocket(host, port, localHost, localPort));
-    }
-
-    @Override
-    public Socket createSocket(InetAddress host, int port) throws IOException {
-      return enforceTls12(delegate.createSocket(host, port));
-    }
-
-    @Override
-    public Socket createSocket(
-      InetAddress address,
-      int port,
-      InetAddress localAddress,
-      int localPort
-    ) throws IOException {
-      return enforceTls12(delegate.createSocket(address, port, localAddress, localPort));
-    }
-
-    private Socket enforceTls12(Socket socket) {
-      if (socket instanceof SSLSocket sslSocket) {
-        sslSocket.setEnabledProtocols(TLS12_ONLY);
-      }
-      return socket;
-    }
   }
 }
