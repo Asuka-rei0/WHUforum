@@ -9,6 +9,7 @@ import com.openisle.model.Tag;
 import com.openisle.model.TreeholeReviewStatus;
 import com.openisle.model.User;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -33,17 +34,18 @@ public interface PostRepository extends JpaRepository<Post, Long> {
     PostStatus status,
     Pageable pageable
   );
-  List<Post> findByAuthorAndTypeOrderByCreatedAtDesc(
-    User author,
-    PostType type,
-    Pageable pageable
-  );
+  List<Post> findByAuthorAndTypeOrderByCreatedAtDesc(User author, PostType type, Pageable pageable);
   List<Post> findByTypeAndTreeholeReviewStatusAndStatusAndVisibleScopeOrderByCreatedAtDesc(
     PostType type,
     TreeholeReviewStatus treeholeReviewStatus,
     PostStatus status,
     PostVisibleScopeType visibleScope,
     Pageable pageable
+  );
+  List<Post> findByTypeAndStatusAndTreeholeReviewStatusInAndTreeholeReviewedAtIsNull(
+    PostType type,
+    PostStatus status,
+    Collection<TreeholeReviewStatus> treeholeReviewStatuses
   );
   List<Post> findByCategoryInAndStatus(List<Category> categories, PostStatus status);
   List<Post> findByCategoryInAndStatus(
@@ -300,17 +302,17 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
   @Query(
     "SELECT MAX(p.createdAt) FROM Post p WHERE p.author.username = :username " +
-    "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
-    "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL " +
-    "AND p.anonymous = false"
+      "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
+      "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL " +
+      "AND p.anonymous = false"
   )
   LocalDateTime findLastPostTime(@Param("username") String username);
 
   @Query(
     "SELECT SUM(p.views) FROM Post p WHERE p.author.username = :username " +
-    "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
-    "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL " +
-    "AND p.anonymous = false"
+      "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
+      "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL " +
+      "AND p.anonymous = false"
   )
   Long sumViews(@Param("username") String username);
 
@@ -356,28 +358,28 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
   @Query(
     "SELECT p FROM Post p WHERE p.type = com.openisle.model.PostType.TREEHOLE AND (" +
-    "p.treeholeRiskLevel IN (" +
-    "com.openisle.model.TreeholeRiskLevel.L2, " +
-    "com.openisle.model.TreeholeRiskLevel.L3, " +
-    "com.openisle.model.TreeholeRiskLevel.L4) OR " +
-    "p.treeholeReviewStatus IN (" +
-    "com.openisle.model.TreeholeReviewStatus.ADMIN_REVIEWING, " +
-    "com.openisle.model.TreeholeReviewStatus.PUBLIC_RESTRICTED, " +
-    "com.openisle.model.TreeholeReviewStatus.REPORTED))"
+      "p.treeholeRiskLevel IN (" +
+      "com.openisle.model.TreeholeRiskLevel.L2, " +
+      "com.openisle.model.TreeholeRiskLevel.L3, " +
+      "com.openisle.model.TreeholeRiskLevel.L4) OR " +
+      "p.treeholeReviewStatus IN (" +
+      "com.openisle.model.TreeholeReviewStatus.ADMIN_REVIEWING, " +
+      "com.openisle.model.TreeholeReviewStatus.PUBLIC_RESTRICTED, " +
+      "com.openisle.model.TreeholeReviewStatus.REPORTED))"
   )
   List<Post> findTreeholeRiskPostsForIntervention();
 
   @Query(
     "SELECT p FROM Post p WHERE p.type = com.openisle.model.PostType.TREEHOLE AND (" +
-    "(p.treeholeReviewStatus = com.openisle.model.TreeholeReviewStatus.PUBLIC " +
-    "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
-    "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL) OR " +
-    "(p.author = :author " +
-    "AND p.treeholeExpectedVisibility = com.openisle.model.TreeholeExpectedVisibility.PUBLIC " +
-    "AND p.treeholeReviewStatus = com.openisle.model.TreeholeReviewStatus.AI_REVIEWING " +
-    "AND p.status = com.openisle.model.PostStatus.PENDING " +
-    "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ONLY_ME)) " +
-    "ORDER BY p.createdAt DESC"
+      "(p.treeholeReviewStatus = com.openisle.model.TreeholeReviewStatus.PUBLIC " +
+      "AND p.status = com.openisle.model.PostStatus.PUBLISHED " +
+      "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ALL) OR " +
+      "(p.author = :author " +
+      "AND p.treeholeExpectedVisibility = com.openisle.model.TreeholeExpectedVisibility.PUBLIC " +
+      "AND p.treeholeReviewStatus = com.openisle.model.TreeholeReviewStatus.AI_REVIEWING " +
+      "AND p.status = com.openisle.model.PostStatus.PENDING " +
+      "AND p.visibleScope = com.openisle.model.PostVisibleScopeType.ONLY_ME)) " +
+      "ORDER BY p.createdAt DESC"
   )
   List<Post> findTreeholeSquareForAuthor(@Param("author") User author, Pageable pageable);
 }

@@ -75,7 +75,7 @@ public class AdminController {
     if (auth != null) {
       treeholeInterventionService.recordLegacyAnonymousReveal(postId, auth.getName());
     }
-    return anonymousAuditService.listByPost(postId);
+    return anonymousAuditService.listByPost(postId, auth.getName());
   }
 
   @GetMapping("/api/admin/sensitive-words")

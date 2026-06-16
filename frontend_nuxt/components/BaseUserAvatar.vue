@@ -85,6 +85,7 @@ const wrapperAttrs = computed(() => {
 
 const handleClick = () => {
   if (props.disableLink) return
+  if (!resolvedLink.value) return
   navigateTo(resolvedLink.value)
 }
 </script>

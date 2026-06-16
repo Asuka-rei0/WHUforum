@@ -250,6 +250,11 @@ public class SecurityConfig {
               authToken
             );
           } catch (Exception e) {
+            if (publicGet) {
+              org.springframework.security.core.context.SecurityContextHolder.clearContext();
+              filterChain.doFilter(request, response);
+              return;
+            }
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             response.getWriter().write("{\"error\": \"Invalid or expired token\"}");

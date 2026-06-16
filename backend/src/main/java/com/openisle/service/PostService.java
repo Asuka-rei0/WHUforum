@@ -260,6 +260,7 @@ public class PostService {
   }
 
   @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
+  @Transactional
   public Post createPost(
     String username,
     Long categoryId,
@@ -498,82 +499,80 @@ public class PostService {
   @Transactional
   public void finalizeProposal(Long postId) {
     scheduledFinalizations.remove(postId);
-    categoryProposalPostRepository
-      .findById(postId)
-      .ifPresent(cp -> {
-        if (cp.getProposalStatus() != CategoryProposalStatus.PENDING) {
-          return;
-        }
-        int totalParticipants = cp.getParticipants() != null ? cp.getParticipants().size() : 0;
-        int approveVotes = 0;
-        if (cp.getVotes() != null) {
-          approveVotes = cp.getVotes().getOrDefault(0, 0);
-        }
-        boolean quorumMet = totalParticipants >= cp.getQuorum();
-        int approvePercent = totalParticipants > 0 ? (approveVotes * 100) / totalParticipants : 0;
-        boolean thresholdMet = approvePercent >= cp.getApproveThreshold();
-        boolean approved = false;
-        String rejectReason = null;
-        if (quorumMet && thresholdMet) {
-          cp.setProposalStatus(CategoryProposalStatus.APPROVED);
-          approved = true;
+    categoryProposalPostRepository.findById(postId).ifPresent(cp -> {
+      if (cp.getProposalStatus() != CategoryProposalStatus.PENDING) {
+        return;
+      }
+      int totalParticipants = cp.getParticipants() != null ? cp.getParticipants().size() : 0;
+      int approveVotes = 0;
+      if (cp.getVotes() != null) {
+        approveVotes = cp.getVotes().getOrDefault(0, 0);
+      }
+      boolean quorumMet = totalParticipants >= cp.getQuorum();
+      int approvePercent = totalParticipants > 0 ? (approveVotes * 100) / totalParticipants : 0;
+      boolean thresholdMet = approvePercent >= cp.getApproveThreshold();
+      boolean approved = false;
+      String rejectReason = null;
+      if (quorumMet && thresholdMet) {
+        cp.setProposalStatus(CategoryProposalStatus.APPROVED);
+        approved = true;
+      } else {
+        cp.setProposalStatus(CategoryProposalStatus.REJECTED);
+        String reason;
+        if (!quorumMet && !thresholdMet) {
+          reason = "未达到法定人数且赞成率不足";
+        } else if (!quorumMet) {
+          reason = "未达到法定人数";
         } else {
-          cp.setProposalStatus(CategoryProposalStatus.REJECTED);
-          String reason;
-          if (!quorumMet && !thresholdMet) {
-            reason = "未达到法定人数且赞成率不足";
-          } else if (!quorumMet) {
-            reason = "未达到法定人数";
-          } else {
-            reason = "赞成率不足";
-          }
-          cp.setRejectReason(reason);
-          rejectReason = reason;
+          reason = "赞成率不足";
         }
-        cp.setResultSnapshot(
-          "approveVotes=" +
-            approveVotes +
-            ", totalParticipants=" +
-            totalParticipants +
-            ", approvePercent=" +
-            approvePercent
+        cp.setRejectReason(reason);
+        rejectReason = reason;
+      }
+      cp.setResultSnapshot(
+        "approveVotes=" +
+          approveVotes +
+          ", totalParticipants=" +
+          totalParticipants +
+          ", approvePercent=" +
+          approvePercent
+      );
+      categoryProposalPostRepository.save(cp);
+      if (approved) {
+        categoryService.createCategory(cp.getProposedName(), cp.getDescription(), "star", null);
+      }
+      if (cp.getAuthor() != null) {
+        notificationService.createNotification(
+          cp.getAuthor(),
+          NotificationType.CATEGORY_PROPOSAL_RESULT_OWNER,
+          cp,
+          null,
+          approved,
+          null,
+          null,
+          approved ? null : rejectReason
         );
-        categoryProposalPostRepository.save(cp);
-        if (approved) {
-          categoryService.createCategory(cp.getProposedName(), cp.getDescription(), "star", null);
+      }
+      for (User participant : cp.getParticipants()) {
+        if (
+          cp.getAuthor() != null &&
+          java.util.Objects.equals(participant.getId(), cp.getAuthor().getId())
+        ) {
+          continue;
         }
-        if (cp.getAuthor() != null) {
-          notificationService.createNotification(
-            cp.getAuthor(),
-            NotificationType.CATEGORY_PROPOSAL_RESULT_OWNER,
-            cp,
-            null,
-            approved,
-            null,
-            null,
-            approved ? null : rejectReason
-          );
-        }
-        for (User participant : cp.getParticipants()) {
-          if (
-            cp.getAuthor() != null &&
-            java.util.Objects.equals(participant.getId(), cp.getAuthor().getId())
-          ) {
-            continue;
-          }
-          notificationService.createNotification(
-            participant,
-            NotificationType.CATEGORY_PROPOSAL_RESULT_PARTICIPANT,
-            cp,
-            null,
-            approved,
-            null,
-            null,
-            approved ? null : rejectReason
-          );
-        }
-        postChangeLogService.recordVoteResult(cp);
-      });
+        notificationService.createNotification(
+          participant,
+          NotificationType.CATEGORY_PROPOSAL_RESULT_PARTICIPANT,
+          cp,
+          null,
+          approved,
+          null,
+          null,
+          approved ? null : rejectReason
+        );
+      }
+      postChangeLogService.recordVoteResult(cp);
+    });
   }
 
   /**
@@ -675,43 +674,41 @@ public class PostService {
   @Transactional
   public void finalizePoll(Long postId) {
     scheduledFinalizations.remove(postId);
-    pollPostRepository
-      .findById(postId)
-      .ifPresent(pp -> {
-        if (pp instanceof CategoryProposalPost) {
-          return;
-        }
-        if (pp.isResultAnnounced()) {
-          return;
-        }
-        pp.setResultAnnounced(true);
-        pollPostRepository.save(pp);
-        if (pp.getAuthor() != null) {
-          notificationService.createNotification(
-            pp.getAuthor(),
-            NotificationType.POLL_RESULT_OWNER,
-            pp,
-            null,
-            null,
-            null,
-            null,
-            null
-          );
-        }
-        for (User participant : pp.getParticipants()) {
-          notificationService.createNotification(
-            participant,
-            NotificationType.POLL_RESULT_PARTICIPANT,
-            pp,
-            null,
-            null,
-            null,
-            null,
-            null
-          );
-        }
-        postChangeLogService.recordVoteResult(pp);
-      });
+    pollPostRepository.findById(postId).ifPresent(pp -> {
+      if (pp instanceof CategoryProposalPost) {
+        return;
+      }
+      if (pp.isResultAnnounced()) {
+        return;
+      }
+      pp.setResultAnnounced(true);
+      pollPostRepository.save(pp);
+      if (pp.getAuthor() != null) {
+        notificationService.createNotification(
+          pp.getAuthor(),
+          NotificationType.POLL_RESULT_OWNER,
+          pp,
+          null,
+          null,
+          null,
+          null,
+          null
+        );
+      }
+      for (User participant : pp.getParticipants()) {
+        notificationService.createNotification(
+          participant,
+          NotificationType.POLL_RESULT_PARTICIPANT,
+          pp,
+          null,
+          null,
+          null,
+          null,
+          null
+        );
+      }
+      postChangeLogService.recordVoteResult(pp);
+    });
   }
 
   @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)
@@ -719,92 +716,88 @@ public class PostService {
   public void finalizeLottery(Long postId) {
     log.info("start to finalizeLottery for {}", postId);
     scheduledFinalizations.remove(postId);
-    lotteryPostRepository
-      .findById(postId)
-      .ifPresent(lp -> {
-        List<User> participants = new ArrayList<>(lp.getParticipants());
-        if (participants.isEmpty()) {
-          return;
+    lotteryPostRepository.findById(postId).ifPresent(lp -> {
+      List<User> participants = new ArrayList<>(lp.getParticipants());
+      if (participants.isEmpty()) {
+        return;
+      }
+      Collections.shuffle(participants);
+      int winnersCount = Math.min(lp.getPrizeCount(), participants.size());
+      java.util.Set<User> winners = new java.util.HashSet<>(participants.subList(0, winnersCount));
+      log.info("winner count {}", winnersCount);
+      lp.setWinners(winners);
+      lotteryPostRepository.save(lp);
+      for (User w : winners) {
+        if (
+          w.getEmail() != null &&
+          !w.getDisabledEmailNotificationTypes().contains(NotificationType.LOTTERY_WIN)
+        ) {
+          try {
+            emailSender.sendEmail(
+              w.getEmail(),
+              "你中奖了",
+              "恭喜你在抽奖贴 \"" + lp.getTitle() + "\" 中获奖"
+            );
+          } catch (EmailSendException e) {
+            log.warn("Failed to send lottery win email to {}: {}", w.getEmail(), e.getMessage());
+          }
         }
-        Collections.shuffle(participants);
-        int winnersCount = Math.min(lp.getPrizeCount(), participants.size());
-        java.util.Set<User> winners = new java.util.HashSet<>(
-          participants.subList(0, winnersCount)
+        notificationService.createNotification(
+          w,
+          NotificationType.LOTTERY_WIN,
+          lp,
+          null,
+          null,
+          lp.getAuthor(),
+          null,
+          null
         );
-        log.info("winner count {}", winnersCount);
-        lp.setWinners(winners);
-        lotteryPostRepository.save(lp);
-        for (User w : winners) {
-          if (
-            w.getEmail() != null &&
-            !w.getDisabledEmailNotificationTypes().contains(NotificationType.LOTTERY_WIN)
-          ) {
-            try {
-              emailSender.sendEmail(
-                w.getEmail(),
-                "你中奖了",
-                "恭喜你在抽奖贴 \"" + lp.getTitle() + "\" 中获奖"
-              );
-            } catch (EmailSendException e) {
-              log.warn("Failed to send lottery win email to {}: {}", w.getEmail(), e.getMessage());
-            }
+        notificationService.sendCustomPush(
+          w,
+          "你中奖了",
+          String.format("%s/posts/%d", websiteUrl, lp.getId())
+        );
+      }
+      if (lp.getAuthor() != null) {
+        if (
+          lp.getAuthor().getEmail() != null &&
+          !lp
+            .getAuthor()
+            .getDisabledEmailNotificationTypes()
+            .contains(NotificationType.LOTTERY_DRAW)
+        ) {
+          try {
+            emailSender.sendEmail(
+              lp.getAuthor().getEmail(),
+              "抽奖已开奖",
+              "您的抽奖贴 \"" + lp.getTitle() + "\" 已开奖"
+            );
+          } catch (EmailSendException e) {
+            log.warn(
+              "Failed to send lottery draw email to {}: {}",
+              lp.getAuthor().getEmail(),
+              e.getMessage()
+            );
           }
-          notificationService.createNotification(
-            w,
-            NotificationType.LOTTERY_WIN,
-            lp,
-            null,
-            null,
-            lp.getAuthor(),
-            null,
-            null
-          );
-          notificationService.sendCustomPush(
-            w,
-            "你中奖了",
-            String.format("%s/posts/%d", websiteUrl, lp.getId())
-          );
         }
-        if (lp.getAuthor() != null) {
-          if (
-            lp.getAuthor().getEmail() != null &&
-            !lp
-              .getAuthor()
-              .getDisabledEmailNotificationTypes()
-              .contains(NotificationType.LOTTERY_DRAW)
-          ) {
-            try {
-              emailSender.sendEmail(
-                lp.getAuthor().getEmail(),
-                "抽奖已开奖",
-                "您的抽奖贴 \"" + lp.getTitle() + "\" 已开奖"
-              );
-            } catch (EmailSendException e) {
-              log.warn(
-                "Failed to send lottery draw email to {}: {}",
-                lp.getAuthor().getEmail(),
-                e.getMessage()
-              );
-            }
-          }
-          notificationService.createNotification(
-            lp.getAuthor(),
-            NotificationType.LOTTERY_DRAW,
-            lp,
-            null,
-            null,
-            null,
-            null,
-            null
-          );
-          notificationService.sendCustomPush(
-            lp.getAuthor(),
-            "抽奖已开奖",
-            String.format("%s/posts/%d", websiteUrl, lp.getId())
-          );
-        }
-        postChangeLogService.recordLotteryResult(lp);
-      });
+        notificationService.createNotification(
+          lp.getAuthor(),
+          NotificationType.LOTTERY_DRAW,
+          lp,
+          null,
+          null,
+          null,
+          null,
+          null
+        );
+        notificationService.sendCustomPush(
+          lp.getAuthor(),
+          "抽奖已开奖",
+          String.format("%s/posts/%d", websiteUrl, lp.getId())
+        );
+      }
+      postChangeLogService.recordLotteryResult(lp);
+    });
   }
 
   @Transactional
@@ -1605,13 +1598,10 @@ public class PostService {
         java.util.Comparator.comparing(
           Post::getPinnedAt,
           java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
-        ).thenComparing(
-          p -> {
-            java.time.LocalDateTime t = commentRepository.findLastCommentTime(p);
-            return t != null ? t : p.getCreatedAt();
-          },
-          java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())
-        )
+        ).thenComparing(p -> {
+          java.time.LocalDateTime t = commentRepository.findLastCommentTime(p);
+          return t != null ? t : p.getCreatedAt();
+        }, java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder()))
       )
       .toList();
   }
@@ -1637,10 +1627,7 @@ public class PostService {
     return new ArrayList<>(posts.subList(from, to));
   }
 
-  private void initializeTreeholeState(
-    Post post,
-    TreeholeExpectedVisibility requestedVisibility
-  ) {
+  private void initializeTreeholeState(Post post, TreeholeExpectedVisibility requestedVisibility) {
     TreeholeExpectedVisibility expectedVisibility =
       requestedVisibility != null ? requestedVisibility : TreeholeExpectedVisibility.ONLY_ME;
     post.setAnonymous(true);
@@ -1657,10 +1644,8 @@ public class PostService {
   private boolean isInitialTreeholeReviewState(Post post) {
     return (
       post.getType() == PostType.TREEHOLE &&
-      (
-        post.getTreeholeReviewStatus() == TreeholeReviewStatus.AI_REVIEWING ||
-        post.getTreeholeReviewStatus() == TreeholeReviewStatus.PRIVATE
-      )
+      (post.getTreeholeReviewStatus() == TreeholeReviewStatus.AI_REVIEWING ||
+        post.getTreeholeReviewStatus() == TreeholeReviewStatus.PRIVATE)
     );
   }
 

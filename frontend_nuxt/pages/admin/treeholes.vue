@@ -6,7 +6,12 @@
         <h1>树洞复审与干预</h1>
         <p>处理 AI 上报的中高风险树洞，记录每一次复审、身份查看和干预动作。</p>
       </div>
-      <button class="refresh-button" type="button" @click="loadCases(true)">
+      <button
+        class="refresh-button"
+        type="button"
+        :disabled="loadingCases"
+        @click="loadCases(true)"
+      >
         <message-one class="button-icon" />
         刷新
       </button>
@@ -55,6 +60,7 @@
               urgent: isUrgent(item.post?.treeholeRiskLevel),
             }"
             type="button"
+            :disabled="loadingDetail"
             @click="selectCase(item)"
           >
             <div class="case-row-top">
@@ -121,10 +127,18 @@
               <span>查看会自动留痕</span>
             </div>
             <div class="identity-form">
-              <input v-model="revealReason" placeholder="填写查看原因" />
-              <button type="button" @click="revealAuthor">
+              <input
+                v-model="revealReason"
+                placeholder="填写查看原因"
+                :disabled="revealingAuthor"
+              />
+              <button
+                type="button"
+                :disabled="revealingAuthor || !revealReason.trim()"
+                @click="revealAuthor"
+              >
                 <user-icon class="button-icon" />
-                查看真实身份
+                {{ revealingAuthor ? '查看中...' : '查看真实身份' }}
               </button>
             </div>
             <div v-if="identity" class="identity-result">
@@ -145,7 +159,7 @@
                 v-for="action in actionButtons"
                 :key="action.id"
                 type="button"
-                :disabled="isClosed"
+                :disabled="isClosed || submittingAction"
                 :class="action.className"
                 @click="executeAction(action.id)"
               >
@@ -165,8 +179,8 @@
                 <time>{{ formatTime(record.createdAt) }}</time>
               </div>
               <div class="record-meta">
-                {{ record.adminUsername || '系统' }} ·
-                {{ statusText(record.fromStatus) }} → {{ statusText(record.toStatus) }} ·
+                {{ record.adminUsername || '系统' }} · {{ statusText(record.fromStatus) }} →
+                {{ statusText(record.toStatus) }} ·
                 {{ reviewStatusText(record.fromReviewStatus) }} →
                 {{ reviewStatusText(record.toReviewStatus) }}
               </div>
@@ -192,11 +206,16 @@ const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
 const toast = useToast()
 
+definePageMeta({ middleware: ['auth-required'] })
+
 const cases = ref([])
 const detail = ref(null)
 const identity = ref(null)
 const selectedPostId = ref(null)
 const loadingCases = ref(false)
+const loadingDetail = ref(false)
+const submittingAction = ref(false)
+const revealingAuthor = ref(false)
 const riskLevel = ref('')
 const caseStatus = ref('')
 const actionNote = ref('')
@@ -210,7 +229,12 @@ const actionButtons = Object.freeze([
   { id: 'ALLOW_PUBLIC', label: '允许公开', icon: 'check', className: 'positive' },
   { id: 'RESTRICT_PUBLIC', label: '限制公开', icon: 'close', className: 'danger' },
   { id: 'MARK_CONTACTED', label: '已联系学生', icon: 'message', className: 'neutral' },
-  { id: 'MARK_TRANSFERRED', label: '已转交心理中心或辅导员', icon: 'message', className: 'neutral' },
+  {
+    id: 'MARK_TRANSFERRED',
+    label: '已转交心理中心或辅导员',
+    icon: 'message',
+    className: 'neutral',
+  },
   { id: 'UPDATE_NOTE', label: '保存备注', icon: 'message', className: 'neutral' },
   { id: 'CLOSE', label: '关闭处理', icon: 'close', className: 'danger' },
 ])
@@ -221,7 +245,7 @@ const authHeaders = () => {
 }
 
 const loadCases = async (reset = false) => {
-  if (!isAdmin.value) return
+  if (!isAdmin.value || loadingCases.value) return
   loadingCases.value = true
   try {
     const url = new URL(`${API_BASE_URL}/api/admin/treeholes/risk`)
@@ -249,10 +273,11 @@ const loadCases = async (reset = false) => {
 }
 
 const selectCase = async (item) => {
-  if (!item?.postId) return
+  if (!item?.postId || loadingDetail.value) return
   selectedPostId.value = item.postId
   identity.value = null
   revealReason.value = ''
+  loadingDetail.value = true
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/treeholes/${item.postId}`, {
       headers: authHeaders(),
@@ -262,11 +287,14 @@ const selectCase = async (item) => {
     actionNote.value = detail.value?.caseInfo?.note || ''
   } catch (e) {
     toast.error(e.message || '加载树洞复审详情失败')
+  } finally {
+    loadingDetail.value = false
   }
 }
 
 const executeAction = async (action) => {
-  if (!selectedPostId.value) return
+  if (!selectedPostId.value || submittingAction.value) return
+  submittingAction.value = true
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/treeholes/${selectedPostId.value}/actions`, {
       method: 'POST',
@@ -280,15 +308,18 @@ const executeAction = async (action) => {
     await loadCases(false)
   } catch (e) {
     toast.error(e.message || '处理失败')
+  } finally {
+    submittingAction.value = false
   }
 }
 
 const revealAuthor = async () => {
-  if (!selectedPostId.value) return
+  if (!selectedPostId.value || revealingAuthor.value) return
   if (!revealReason.value.trim()) {
     toast.error('请先填写查看原因')
     return
   }
+  revealingAuthor.value = true
   try {
     const res = await fetch(
       `${API_BASE_URL}/api/admin/treeholes/${selectedPostId.value}/reveal-author`,
@@ -296,7 +327,7 @@ const revealAuthor = async () => {
         method: 'POST',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         body: JSON.stringify({ reason: revealReason.value }),
-      }
+      },
     )
     if (!res.ok) throw new Error(await readError(res))
     identity.value = await res.json()
@@ -304,6 +335,8 @@ const revealAuthor = async () => {
     await selectCase({ postId: selectedPostId.value })
   } catch (e) {
     toast.error(e.message || '查看真实身份失败')
+  } finally {
+    revealingAuthor.value = false
   }
 }
 
@@ -428,6 +461,13 @@ onMounted(async () => {
   background: var(--background-color-secondary);
   color: var(--text-color);
   cursor: pointer;
+}
+
+.refresh-button:disabled,
+.identity-form button:disabled,
+.case-row:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .button-icon {

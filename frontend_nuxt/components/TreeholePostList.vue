@@ -4,23 +4,12 @@
       <l-hatch size="28" stroke="4" speed="3.5" color="var(--primary-color)"></l-hatch>
     </div>
     <BasePlaceholder v-else-if="posts.length === 0" :text="emptyText" icon="Inbox" />
-    <div
-      v-else
-      v-for="post in posts"
-      :key="post.id"
-      class="treehole-item"
-      @click="goPost(post)"
-    >
+    <div v-else v-for="post in posts" :key="post.id" class="treehole-item" @click="goPost(post)">
       <div class="treehole-item-header">
         <div class="treehole-author">
-          <BaseUserAvatar
-            :src="post.author?.avatar"
-            :user-id="post.author?.id"
-            :disable-link="true"
-            :width="32"
-          />
+          <BaseUserAvatar :src="treeholeAvatar" :user-id="null" :disable-link="true" :width="32" />
           <div class="treehole-author-meta">
-            <div class="treehole-author-name">{{ post.author?.username || '珞珈匿名' }}</div>
+            <div class="treehole-author-name">{{ treeholeAuthorName(post) }}</div>
             <div class="treehole-time">{{ formatTime(post.createdAt) }}</div>
           </div>
         </div>
@@ -65,10 +54,16 @@ defineProps({
   emptyText: { type: String, default: '暂无树洞' },
 })
 
+const treeholeAvatar = '/whu-emblem.webp'
+
+const treeholeAuthorName = (post) => post?.anonymousAlias || '珞珈匿名'
+
 const formatTime = (value) => TimeManager.format(value)
 
 const snippet = (content) => {
-  const text = stripMarkdown(content || '').replace(/\s+/g, ' ').trim()
+  const text = stripMarkdown(content || '')
+    .replace(/\s+/g, ' ')
+    .trim()
   return text.length > 220 ? `${text.slice(0, 220)}...` : text
 }
 

@@ -7,6 +7,7 @@ import com.openisle.exception.RateLimitException;
 import com.openisle.model.*;
 import com.openisle.repository.*;
 import com.openisle.search.SearchIndexEventPublisher;
+import java.lang.reflect.Method;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -16,8 +17,41 @@ import org.springframework.context.ApplicationContext;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.scheduling.TaskScheduler;
+import org.springframework.transaction.annotation.Transactional;
 
 class PostServiceTest {
+
+  @Test
+  void createPostIsTransactional() throws NoSuchMethodException {
+    Method method = PostService.class.getMethod(
+      "createPost",
+      String.class,
+      Long.class,
+      String.class,
+      String.class,
+      List.class,
+      PostType.class,
+      PostVisibleScopeType.class,
+      TreeholeExpectedVisibility.class,
+      String.class,
+      String.class,
+      Integer.class,
+      Integer.class,
+      LocalDateTime.class,
+      LocalDateTime.class,
+      List.class,
+      Boolean.class,
+      String.class,
+      String.class,
+      Boolean.class,
+      Boolean.class,
+      java.math.BigDecimal.class,
+      String.class,
+      String.class
+    );
+
+    assertNotNull(method.getAnnotation(Transactional.class));
+  }
 
   @Test
   void deletePostRemovesReads() {

@@ -13,13 +13,17 @@ import com.openisle.repository.PostRepository;
 import com.openisle.repository.UserRepository;
 import com.openisle.search.SearchIndexEventPublisher;
 import java.time.LocalDateTime;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.scheduling.annotation.Async;
+import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.event.TransactionPhase;
+import org.springframework.transaction.event.TransactionalEventListener;
 
 @Slf4j
 @Service
@@ -37,7 +41,7 @@ public class TreeholeReviewService {
   private boolean aiReviewEnabled;
 
   @Async("treeholeReviewExecutor")
-  @EventListener
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   @Transactional
   public void handleTreeholeReviewRequested(TreeholeReviewRequestedEvent event) {
     if (!aiReviewEnabled) {
@@ -45,6 +49,26 @@ public class TreeholeReviewService {
       return;
     }
     postRepository.findById(event.postId()).ifPresent(this::reviewPost);
+  }
+
+  @Async("treeholeReviewExecutor")
+  @EventListener(ApplicationReadyEvent.class)
+  @Transactional
+  public void recoverPendingTreeholeReviews() {
+    if (!aiReviewEnabled) {
+      return;
+    }
+    List<Post> pendingReviews =
+      postRepository.findByTypeAndStatusAndTreeholeReviewStatusInAndTreeholeReviewedAtIsNull(
+        PostType.TREEHOLE,
+        PostStatus.PENDING,
+        List.of(TreeholeReviewStatus.AI_REVIEWING, TreeholeReviewStatus.PRIVATE)
+      );
+    if (pendingReviews.isEmpty()) {
+      return;
+    }
+    log.info("Recovering {} pending treehole AI review(s)", pendingReviews.size());
+    pendingReviews.forEach(this::reviewPost);
   }
 
   private void reviewPost(Post post) {
@@ -64,6 +88,9 @@ public class TreeholeReviewService {
 
   private boolean isReviewableTreehole(Post post) {
     if (post.getType() != PostType.TREEHOLE || post.getStatus() != PostStatus.PENDING) {
+      return false;
+    }
+    if (post.getTreeholeReviewedAt() != null) {
       return false;
     }
     return (
@@ -106,7 +133,10 @@ public class TreeholeReviewService {
     post.setStatus(PostStatus.PENDING);
     post.setVisibleScope(PostVisibleScopeType.ONLY_ME);
     Post saved = postRepository.save(post);
-    treeholeInterventionService.ensureCase(saved, buildAdminMessage("Treehole requires admin review", result));
+    treeholeInterventionService.ensureCase(
+      saved,
+      buildAdminMessage("Treehole requires admin review", result)
+    );
     notifyAdmins(
       saved,
       NotificationType.POST_REVIEW_REQUEST,
@@ -124,7 +154,10 @@ public class TreeholeReviewService {
     post.setVisibleScope(PostVisibleScopeType.ONLY_ME);
     Post saved = postRepository.save(post);
     searchIndexEventPublisher.publishPostDeleted(saved.getId());
-    treeholeInterventionService.ensureCase(saved, buildAdminMessage("Treehole restricted and reported", result));
+    treeholeInterventionService.ensureCase(
+      saved,
+      buildAdminMessage("Treehole restricted and reported", result)
+    );
     notifyAdmins(
       saved,
       NotificationType.MODERATION_ALERT,
@@ -164,12 +197,12 @@ public class TreeholeReviewService {
   private String buildAdminMessage(String prefix, AiReviewResult result) {
     return truncate(
       prefix +
-      ": risk=" +
-      result.riskLevel() +
-      ", reason=" +
-      nullToEmpty(result.reason()) +
-      ", action=" +
-      nullToEmpty(result.recommendedAction()),
+        ": risk=" +
+        result.riskLevel() +
+        ", reason=" +
+        nullToEmpty(result.reason()) +
+        ", action=" +
+        nullToEmpty(result.recommendedAction()),
       1000
     );
   }

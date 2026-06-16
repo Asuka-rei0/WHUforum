@@ -1,5 +1,5 @@
-export const TREEHOLE_CATEGORY_NAMES = ['树洞互助', '鏍戞礊浜掑姪']
-export const TREEHOLE_TAG_NAMES = ['树洞', '鏍戞礊']
+export const TREEHOLE_CATEGORY_NAMES = ['树洞互助']
+export const TREEHOLE_TAG_NAMES = ['树洞']
 
 export const TREEHOLE_STATUS_TEXT = Object.freeze({
   AI_REVIEWING: '审核中，仅你可见',

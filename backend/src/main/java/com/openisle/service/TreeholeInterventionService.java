@@ -13,6 +13,7 @@ import com.openisle.model.Post;
 import com.openisle.model.PostStatus;
 import com.openisle.model.PostType;
 import com.openisle.model.PostVisibleScopeType;
+import com.openisle.model.Role;
 import com.openisle.model.TreeholeExpectedVisibility;
 import com.openisle.model.TreeholeInterventionAction;
 import com.openisle.model.TreeholeInterventionCase;
@@ -29,6 +30,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -47,12 +49,12 @@ public class TreeholeInterventionService {
   private final SearchIndexEventPublisher searchIndexEventPublisher;
   private final PostMapper postMapper;
 
-  @Transactional
+  @Transactional(noRollbackFor = DataIntegrityViolationException.class)
   public TreeholeInterventionCase ensureCase(Post post, String note) {
     requireTreehole(post);
     return caseRepository
       .findByPost_Id(post.getId())
-      .orElseGet(() -> createCase(post, note));
+      .orElseGet(() -> createCaseOrLoadExisting(post, note));
   }
 
   @Transactional
@@ -75,7 +77,7 @@ public class TreeholeInterventionService {
     TreeholeInterventionCase interventionCase = getOrCreateCaseForPostId(postId);
     TreeholeInterventionDetailDto dto = new TreeholeInterventionDetailDto();
     dto.setCaseInfo(toCaseDto(interventionCase));
-    dto.setPost(postMapper.toSummaryDto(interventionCase.getPost()));
+    dto.setPost(postMapper.toAdminSummaryDto(interventionCase.getPost()));
     dto.setRecords(
       recordRepository
         .findByInterventionCase_IdOrderByCreatedAtAsc(interventionCase.getId())
@@ -174,12 +176,20 @@ public class TreeholeInterventionService {
     return ensureCase(post, "Treehole intervention case created by admin access");
   }
 
+  private TreeholeInterventionCase createCaseOrLoadExisting(Post post, String note) {
+    try {
+      return createCase(post, note);
+    } catch (DataIntegrityViolationException ex) {
+      return caseRepository.findByPost_Id(post.getId()).orElseThrow(() -> ex);
+    }
+  }
+
   private TreeholeInterventionCase createCase(Post post, String note) {
     TreeholeInterventionCase interventionCase = new TreeholeInterventionCase();
     interventionCase.setPost(post);
     interventionCase.setStatus(TreeholeInterventionStatus.OPEN);
     interventionCase.setNote(truncate(note));
-    TreeholeInterventionCase saved = caseRepository.save(interventionCase);
+    TreeholeInterventionCase saved = caseRepository.saveAndFlush(interventionCase);
     recordAction(
       saved,
       post,
@@ -261,7 +271,9 @@ public class TreeholeInterventionService {
   }
 
   private void updateSearchIndex(Post post) {
-    if (post.getStatus() == PostStatus.PUBLISHED && post.getVisibleScope() == PostVisibleScopeType.ALL) {
+    if (
+      post.getStatus() == PostStatus.PUBLISHED && post.getVisibleScope() == PostVisibleScopeType.ALL
+    ) {
       searchIndexEventPublisher.publishPostSaved(post);
       return;
     }
@@ -302,7 +314,7 @@ public class TreeholeInterventionService {
     dto.setCreatedAt(interventionCase.getCreatedAt());
     dto.setUpdatedAt(interventionCase.getUpdatedAt());
     dto.setClosedAt(interventionCase.getClosedAt());
-    dto.setPost(postMapper.toSummaryDto(interventionCase.getPost()));
+    dto.setPost(postMapper.toAdminSummaryDto(interventionCase.getPost()));
     return dto;
   }
 
@@ -347,9 +359,13 @@ public class TreeholeInterventionService {
   }
 
   private User getAdmin(String adminUsername) {
-    return userRepository
+    User admin = userRepository
       .findByUsername(adminUsername)
       .orElseThrow(() -> new NotFoundException("Admin not found"));
+    if (admin.getRole() != Role.ADMIN) {
+      throw new IllegalArgumentException("Admin role required");
+    }
+    return admin;
   }
 
   private Pageable buildPageable(Integer page, Integer pageSize) {
@@ -381,7 +397,12 @@ public class TreeholeInterventionService {
     }
 
     static Snapshot empty(Post post) {
-      return new Snapshot(null, post.getTreeholeReviewStatus(), post.getStatus(), post.getVisibleScope());
+      return new Snapshot(
+        null,
+        post.getTreeholeReviewStatus(),
+        post.getStatus(),
+        post.getVisibleScope()
+      );
     }
   }
 }

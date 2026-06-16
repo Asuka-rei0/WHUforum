@@ -4,8 +4,10 @@ import com.openisle.dto.AnonymousAuditDto;
 import com.openisle.model.AnonymousAudit;
 import com.openisle.model.Comment;
 import com.openisle.model.Post;
+import com.openisle.model.Role;
 import com.openisle.model.User;
 import com.openisle.repository.AnonymousAuditRepository;
+import com.openisle.repository.UserRepository;
 import java.security.SecureRandom;
 import java.util.Collection;
 import java.util.List;
@@ -19,6 +21,7 @@ public class AnonymousAuditService {
 
   private static final SecureRandom RANDOM = new SecureRandom();
   private final AnonymousAuditRepository anonymousAuditRepository;
+  private final UserRepository userRepository;
 
   public String createAlias() {
     return "珞珈匿名" + (1000 + RANDOM.nextInt(9000));
@@ -43,12 +46,22 @@ public class AnonymousAuditService {
     anonymousAuditRepository.save(audit);
   }
 
-  public List<AnonymousAuditDto> listByPost(Long postId) {
+  public List<AnonymousAuditDto> listByPost(Long postId, String adminUsername) {
+    requireAdmin(adminUsername);
     return anonymousAuditRepository
       .findByPost_IdOrderByCreatedAtAsc(postId)
       .stream()
       .map(this::toDto)
       .toList();
+  }
+
+  private void requireAdmin(String adminUsername) {
+    User admin = userRepository
+      .findByUsername(adminUsername)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("Admin not found"));
+    if (admin.getRole() != Role.ADMIN) {
+      throw new IllegalArgumentException("Admin role required");
+    }
   }
 
   @Transactional

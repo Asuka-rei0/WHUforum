@@ -10,8 +10,8 @@ import com.openisle.model.PostStatus;
 import com.openisle.model.PostVisibleScopeType;
 import com.openisle.model.Role;
 import com.openisle.model.TreeholeInterventionAction;
-import com.openisle.model.TreeholeRiskLevel;
 import com.openisle.model.TreeholeReviewStatus;
+import com.openisle.model.TreeholeRiskLevel;
 import com.openisle.model.User;
 import com.openisle.repository.PostRepository;
 import com.openisle.repository.TreeholeInterventionRecordRepository;
@@ -24,13 +24,13 @@ import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
-import org.springframework.cache.CacheManager;
-import org.springframework.cache.concurrent.ConcurrentMapCache;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.boot.test.web.client.TestRestTemplate;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.concurrent.ConcurrentMapCache;
 import org.springframework.data.redis.connection.ReactiveRedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -82,8 +82,9 @@ class TreeholePostIntegrationTest {
 
   @BeforeEach
   void setUpCacheManager() {
-    when(cacheManager.getCache(anyString()))
-      .thenAnswer(invocation -> new ConcurrentMapCache(invocation.getArgument(0)));
+    when(cacheManager.getCache(anyString())).thenAnswer(invocation ->
+      new ConcurrentMapCache(invocation.getArgument(0))
+    );
     clearInvocations(treeholeReviewService);
   }
 
@@ -183,7 +184,12 @@ class TreeholePostIntegrationTest {
     return new PostTarget(catId, tagId);
   }
 
-  private Long createTreehole(String authorToken, PostTarget target, String suffix, String visibility) {
+  private Long createTreehole(
+    String authorToken,
+    PostTarget target,
+    String suffix,
+    String visibility
+  ) {
     ResponseEntity<Map> postResp = postJson(
       "/api/posts",
       Map.of(
@@ -238,11 +244,38 @@ class TreeholePostIntegrationTest {
     posts.save(post);
   }
 
+  private void applyTreeholeRiskMetadata(Long postId, TreeholeRiskLevel riskLevel) {
+    Post post = posts.findById(postId).orElseThrow();
+    post.setTreeholeRiskLevel(riskLevel);
+    post.setTreeholeRiskReason("risk reason " + riskLevel);
+    post.setTreeholeRecommendedAction("recommended action " + riskLevel);
+    post.setTreeholeReviewedAt(LocalDateTime.now());
+    posts.save(post);
+  }
+
   private boolean containsPostId(List body, Long postId) {
     return body.stream().anyMatch(item -> {
       Map post = (Map) item;
       return ((Number) post.get("id")).longValue() == postId.longValue();
     });
+  }
+
+  private Map findPostById(List body, Long postId) {
+    return (Map) body
+      .stream()
+      .filter(item -> {
+        Map post = (Map) item;
+        return ((Number) post.get("id")).longValue() == postId.longValue();
+      })
+      .findFirst()
+      .orElseThrow();
+  }
+
+  private void assertNoTreeholeRiskMetadata(Map post) {
+    assertNull(post.get("treeholeRiskLevel"));
+    assertNull(post.get("treeholeRiskReason"));
+    assertNull(post.get("treeholeRecommendedAction"));
+    assertNull(post.get("treeholeReviewedAt"));
   }
 
   private boolean containsCasePostId(List body, Long postId) {
@@ -267,9 +300,7 @@ class TreeholePostIntegrationTest {
 
   private boolean recordsContainAction(Map detail, String action) {
     List records = (List) detail.get("records");
-    return records
-      .stream()
-      .anyMatch(record -> action.equals(((Map) record).get("action")));
+    return records.stream().anyMatch(record -> action.equals(((Map) record).get("action")));
   }
 
   private boolean listContainsText(List body, String text) {
@@ -324,12 +355,13 @@ class TreeholePostIntegrationTest {
     ResponseEntity<Map> otherDetail = get("/api/posts/" + postId, Map.class, otherToken);
     assertEquals(HttpStatus.NOT_FOUND, otherDetail.getStatusCode());
     verify(treeholeReviewService, timeout(1000)).handleTreeholeReviewRequested(
-      argThat(event ->
-        event.postId().equals(postId) &&
-        event.expectedVisibility().name().equals("PUBLIC") &&
-        event.initialReviewStatus().name().equals("AI_REVIEWING") &&
-        !event.moderationFlagged() &&
-        !event.crisisFlagged()
+      argThat(
+        event ->
+          event.postId().equals(postId) &&
+          event.expectedVisibility().name().equals("PUBLIC") &&
+          event.initialReviewStatus().name().equals("AI_REVIEWING") &&
+          !event.moderationFlagged() &&
+          !event.crisisFlagged()
       )
     );
   }
@@ -368,12 +400,13 @@ class TreeholePostIntegrationTest {
     assertEquals("ONLY_ME", body.get("visibleScope"));
     Long postId = ((Number) body.get("id")).longValue();
     verify(treeholeReviewService, timeout(1000)).handleTreeholeReviewRequested(
-      argThat(event ->
-        event.postId().equals(postId) &&
-        event.expectedVisibility().name().equals("ONLY_ME") &&
-        event.initialReviewStatus().name().equals("PRIVATE") &&
-        !event.moderationFlagged() &&
-        !event.crisisFlagged()
+      argThat(
+        event ->
+          event.postId().equals(postId) &&
+          event.expectedVisibility().name().equals("ONLY_ME") &&
+          event.initialReviewStatus().name().equals("PRIVATE") &&
+          !event.moderationFlagged() &&
+          !event.crisisFlagged()
       )
     );
   }
@@ -442,11 +475,12 @@ class TreeholePostIntegrationTest {
     assertEquals("PENDING", body.get("status"));
     assertEquals("ONLY_ME", body.get("visibleScope"));
     verify(treeholeReviewService, timeout(1000)).handleTreeholeReviewRequested(
-      argThat(event ->
-        event.postId().equals(postId) &&
-        event.moderationFlagged() &&
-        event.crisisFlagged() &&
-        "crisisword".equals(event.matchedWord())
+      argThat(
+        event ->
+          event.postId().equals(postId) &&
+          event.moderationFlagged() &&
+          event.crisisFlagged() &&
+          "crisisword".equals(event.matchedWord())
       )
     );
   }
@@ -459,14 +493,24 @@ class TreeholePostIntegrationTest {
 
     Long publicId = createTreehole(authorToken, target, "published", "PUBLIC");
     markTreeholePublic(publicId);
+    applyTreeholeRiskMetadata(publicId, TreeholeRiskLevel.L1);
     clearPostLimit("th_author6");
     Long reviewingId = createTreehole(authorToken, target, "reviewing", "PUBLIC");
 
     ResponseEntity<List> squareResp = getList("/api/treeholes/square?page=0&pageSize=20", null);
+    ResponseEntity<List> invalidTokenSquareResp = getList(
+      "/api/treeholes/square?page=0&pageSize=20",
+      "invalid-token"
+    );
 
     assertEquals(HttpStatus.OK, squareResp.getStatusCode());
     assertTrue(containsPostId(squareResp.getBody(), publicId));
     assertFalse(containsPostId(squareResp.getBody(), reviewingId));
+    Map publicPost = findPostById(squareResp.getBody(), publicId);
+    assertEquals("PUBLIC", publicPost.get("treeholeReviewStatus"));
+    assertNoTreeholeRiskMetadata(publicPost);
+    assertEquals(HttpStatus.OK, invalidTokenSquareResp.getStatusCode());
+    assertTrue(containsPostId(invalidTokenSquareResp.getBody(), publicId));
   }
 
   @Test
@@ -503,6 +547,7 @@ class TreeholePostIntegrationTest {
 
     Long postId = createTreehole(authorToken, target, "identity-safe", "PUBLIC");
     markTreeholePublic(postId);
+    applyTreeholeRiskMetadata(postId, TreeholeRiskLevel.L1);
 
     ResponseEntity<Map> commentResp = postJson(
       "/api/posts/" + postId + "/comments",
@@ -528,15 +573,20 @@ class TreeholePostIntegrationTest {
     Map author = (Map) body.get("author");
     assertEquals(true, author.get("anonymous"));
     assertNotEquals("th_author12", author.get("username"));
+    assertNoTreeholeRiskMetadata(body);
     assertFalse(listContainsText((List) body.get("participants"), "th_author12"));
     assertFalse(listContainsText((List) body.get("participants"), "th_commenter12"));
     assertFalse(listContainsText((List) body.get("reactions"), "th_commenter12"));
-    assertTrue(((List) body.get("comments")).stream().allMatch(item -> {
-      Map comment = (Map) item;
-      Map itemAuthor = (Map) comment.get("author");
-      return Boolean.TRUE.equals(itemAuthor.get("anonymous")) &&
-        !"th_commenter12".equals(itemAuthor.get("username"));
-    }));
+    assertTrue(
+      ((List) body.get("comments")).stream().allMatch(item -> {
+        Map comment = (Map) item;
+        Map itemAuthor = (Map) comment.get("author");
+        return (
+          Boolean.TRUE.equals(itemAuthor.get("anonymous")) &&
+          !"th_commenter12".equals(itemAuthor.get("username"))
+        );
+      })
+    );
 
     ResponseEntity<List> timelineResp = getList(
       "/api/posts/" + postId + "/comments?page=0&pageSize=20",
@@ -789,6 +839,11 @@ class TreeholePostIntegrationTest {
       Map.of("reason", "risk intervention"),
       adminToken
     );
+    ResponseEntity<Map> forbiddenAuditResp = get(
+      "/api/admin/anonymous/posts/" + postId,
+      Map.class,
+      userToken
+    );
     getList("/api/admin/anonymous/posts/" + postId, adminToken);
 
     assertEquals(HttpStatus.OK, detailResp.getStatusCode());
@@ -797,9 +852,12 @@ class TreeholePostIntegrationTest {
     Map caseInfo = (Map) detail.get("caseInfo");
     assertEquals(postId.longValue(), ((Number) post.get("id")).longValue());
     assertEquals("L3", post.get("treeholeRiskLevel"));
+    assertEquals("risk reason L3", post.get("treeholeRiskReason"));
+    assertEquals("recommended action L3", post.get("treeholeRecommendedAction"));
     assertEquals("PUBLIC_RESTRICTED", post.get("treeholeReviewStatus"));
     assertEquals("OPEN", caseInfo.get("status"));
     assertNotEquals(HttpStatus.OK, forbiddenReveal.getStatusCode());
+    assertNotEquals(HttpStatus.OK, forbiddenAuditResp.getStatusCode());
     assertEquals(HttpStatus.OK, revealResp.getStatusCode());
     assertEquals("th_author10", revealResp.getBody().get("username"));
     assertEquals(
@@ -821,12 +879,7 @@ class TreeholePostIntegrationTest {
     markTreeholeRisk(allowId, TreeholeRiskLevel.L2, TreeholeReviewStatus.ADMIN_REVIEWING);
     getList("/api/admin/treeholes/risk?page=0&pageSize=20", adminToken);
 
-    ResponseEntity<Map> allowResp = postAction(
-      allowId,
-      "ALLOW_PUBLIC",
-      "allow public",
-      adminToken
-    );
+    ResponseEntity<Map> allowResp = postAction(allowId, "ALLOW_PUBLIC", "allow public", adminToken);
     Post allowPost = posts.findById(allowId).orElseThrow();
     ResponseEntity<Map> closedActionResp = postAction(
       allowId,
@@ -882,7 +935,12 @@ class TreeholePostIntegrationTest {
       "transferred",
       adminToken
     );
-    ResponseEntity<Map> noteResp = postAction(restrictedId, "UPDATE_NOTE", "latest note", adminToken);
+    ResponseEntity<Map> noteResp = postAction(
+      restrictedId,
+      "UPDATE_NOTE",
+      "latest note",
+      adminToken
+    );
     ResponseEntity<Map> closeResp = postAction(restrictedId, "CLOSE", "done", adminToken);
     Post restrictedPost = posts.findById(restrictedId).orElseThrow();
 

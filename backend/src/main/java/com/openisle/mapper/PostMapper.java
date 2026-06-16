@@ -51,6 +51,13 @@ public class PostMapper {
     return dto;
   }
 
+  public PostSummaryDto toAdminSummaryDto(Post post) {
+    PostSummaryDto dto = new PostSummaryDto();
+    applyListFields(post, dto);
+    applyInternalTreeholeReviewFields(post, dto);
+    return dto;
+  }
+
   public List<PostSummaryDto> toListDtos(List<Post> posts) {
     if (posts == null || posts.isEmpty()) {
       return List.of();
@@ -124,10 +131,6 @@ public class PostMapper {
     dto.setType(post.getType());
     dto.setTreeholeExpectedVisibility(post.getTreeholeExpectedVisibility());
     dto.setTreeholeReviewStatus(post.getTreeholeReviewStatus());
-    dto.setTreeholeRiskLevel(post.getTreeholeRiskLevel());
-    dto.setTreeholeRiskReason(post.getTreeholeRiskReason());
-    dto.setTreeholeRecommendedAction(post.getTreeholeRecommendedAction());
-    dto.setTreeholeReviewedAt(post.getTreeholeReviewedAt());
     dto.setAnonymous(post.isAnonymous());
     dto.setAnonymousAlias(post.getAnonymousAlias());
     fleaMarketItemRepository
@@ -156,10 +159,6 @@ public class PostMapper {
     dto.setVisibleScope(post.getVisibleScope());
     dto.setTreeholeExpectedVisibility(post.getTreeholeExpectedVisibility());
     dto.setTreeholeReviewStatus(post.getTreeholeReviewStatus());
-    dto.setTreeholeRiskLevel(post.getTreeholeRiskLevel());
-    dto.setTreeholeRiskReason(post.getTreeholeRiskReason());
-    dto.setTreeholeRecommendedAction(post.getTreeholeRecommendedAction());
-    dto.setTreeholeReviewedAt(post.getTreeholeReviewedAt());
     dto.setAnonymous(post.isAnonymous());
     dto.setAnonymousAlias(post.getAnonymousAlias());
     fleaMarketItemRepository
@@ -244,6 +243,13 @@ public class PostMapper {
     target.setOptionParticipants(optionParticipants);
     target.setMultiple(Boolean.TRUE.equals(pollPost.getMultiple()));
     return target;
+  }
+
+  private void applyInternalTreeholeReviewFields(Post post, PostSummaryDto dto) {
+    dto.setTreeholeRiskLevel(post.getTreeholeRiskLevel());
+    dto.setTreeholeRiskReason(post.getTreeholeRiskReason());
+    dto.setTreeholeRecommendedAction(post.getTreeholeRecommendedAction());
+    dto.setTreeholeReviewedAt(post.getTreeholeReviewedAt());
   }
 
   private com.openisle.dto.FleaMarketItemDto toFleaDto(FleaMarketItem item) {
