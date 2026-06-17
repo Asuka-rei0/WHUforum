@@ -196,7 +196,7 @@ class AuthControllerTest {
   }
 
   @Test
-  void loginFails() throws Exception {
+  void loginFailsWhenEmailIsNotRegistered() throws Exception {
     Mockito.when(userService.findByEmail("u@whu.edu.cn")).thenReturn(Optional.empty());
 
     mockMvc
@@ -206,7 +206,28 @@ class AuthControllerTest {
           .content("{\"email\":\"u@whu.edu.cn\",\"password\":\"bad\"}")
       )
       .andExpect(status().isBadRequest())
-      .andExpect(jsonPath("$.reason_code").value("INVALID_CREDENTIALS"));
+      .andExpect(jsonPath("$.field").value("email"))
+      .andExpect(jsonPath("$.reason_code").value("EMAIL_NOT_REGISTERED"));
+  }
+
+  @Test
+  void loginFailsWhenPasswordIsInvalid() throws Exception {
+    User user = new User();
+    user.setUsername("u");
+    user.setEmail("u@whu.edu.cn");
+    user.setVerified(true);
+    Mockito.when(userService.findByEmail("u@whu.edu.cn")).thenReturn(Optional.of(user));
+    Mockito.when(userService.matchesPassword(user, "bad")).thenReturn(false);
+
+    mockMvc
+      .perform(
+        post("/api/auth/login")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content("{\"email\":\"u@whu.edu.cn\",\"password\":\"bad\"}")
+      )
+      .andExpect(status().isBadRequest())
+      .andExpect(jsonPath("$.field").value("password"))
+      .andExpect(jsonPath("$.reason_code").value("INVALID_PASSWORD"));
   }
 
   @Test

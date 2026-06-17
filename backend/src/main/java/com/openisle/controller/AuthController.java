@@ -214,9 +214,21 @@ public class AuthController {
       );
     }
     Optional<User> userOpt = userService.findByEmail(email);
-    if (userOpt.isEmpty() || !userService.matchesPassword(userOpt.get(), req.getPassword())) {
+    if (userOpt.isEmpty()) {
       return ResponseEntity.badRequest().body(
-        Map.of("error", "Invalid credentials", "reason_code", "INVALID_CREDENTIALS")
+        Map.of(
+          "field",
+          "email",
+          "error",
+          "Email not registered",
+          "reason_code",
+          "EMAIL_NOT_REGISTERED"
+        )
+      );
+    }
+    if (!userService.matchesPassword(userOpt.get(), req.getPassword())) {
+      return ResponseEntity.badRequest().body(
+        Map.of("field", "password", "error", "Invalid password", "reason_code", "INVALID_PASSWORD")
       );
     }
     User user = userOpt.get();

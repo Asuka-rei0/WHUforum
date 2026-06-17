@@ -144,6 +144,10 @@ const submitLogin = async () => {
       emailError.value = getApiErrorMessage(data, '请使用 @whu.edu.cn 邮箱登录')
       return
     }
+    if (data.field === 'password' || data.reason_code === 'INVALID_PASSWORD') {
+      passwordError.value = getApiErrorMessage(data, '密码不正确')
+      return
+    }
     toast.error(getApiErrorMessage(data, '邮箱或密码不正确'))
   } catch (e) {
     toast.error('登录失败，请稍后重试')

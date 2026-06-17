@@ -40,11 +40,12 @@ export const isDuplicateUsernameError = (error) => {
 const getKnownErrorMessage = (error) => {
   const reasonCode = getReasonCode(error)
   if (reasonCode === 'WHU_EMAIL_REQUIRED') return '请使用 @whu.edu.cn 邮箱'
+  if (reasonCode === 'EMAIL_NOT_REGISTERED') return '此邮箱未注册'
   if (reasonCode === 'INVALID_CREDENTIALS') return '登录状态已失效，请重新登录'
   if (reasonCode === 'NOT_VERIFIED') return '账号尚未完成邮箱验证'
   if (reasonCode === 'NOT_APPROVED') return '账号尚未通过审核'
   if (reasonCode === 'IS_APPROVING') return '账号正在审核中'
-  if (reasonCode === 'INVALID_PASSWORD') return '当前密码不正确'
+  if (reasonCode === 'INVALID_PASSWORD') return '密码不正确'
 
   if (isDuplicateEmailError(error)) return '该邮箱已注册，请直接登录，或使用其他武汉大学邮箱'
   if (isDuplicateUsernameError(error)) return '该用户名已被占用，请换一个昵称'
