@@ -59,6 +59,7 @@ public class MessageService {
     );
     MessageConversation conversation = findOrCreateConversation(sender, recipient);
     log.info("Conversation found or created with ID: {}", conversation.getId());
+    restoreConversationForParticipants(conversation);
 
     Message message = new Message();
     message.setConversation(conversation);
@@ -72,6 +73,7 @@ public class MessageService {
     }
     message = messageRepository.save(message);
     log.info("Message saved with ID: {}", message.getId());
+    markConversationAsReadIfParticipant(conversation, senderId);
 
     conversation.setLastMessage(message);
     conversationRepository.save(conversation);
@@ -98,6 +100,10 @@ public class MessageService {
             Map<String, Object> participantInfo = new HashMap<>();
             participantInfo.put("userId", p.getUser().getId());
             participantInfo.put("username", p.getUser().getUsername());
+            participantInfo.put(
+              "unreadCount",
+              p.getUser().getId().equals(recipientId) ? unreadCount : 0
+            );
             return participantInfo;
           })
           .collect(Collectors.toList())
@@ -148,8 +154,11 @@ public class MessageService {
         MessageParticipant p = new MessageParticipant();
         p.setConversation(conversation);
         p.setUser(sender);
-        return participantRepository.save(p);
+        MessageParticipant saved = participantRepository.save(p);
+        conversation.getParticipants().add(saved);
+        return saved;
       });
+    restoreConversationForParticipants(conversation);
 
     Message message = new Message();
     message.setConversation(conversation);
@@ -162,6 +171,7 @@ public class MessageService {
       message.setReplyTo(replyTo);
     }
     message = messageRepository.save(message);
+    markConversationAsReadIfParticipant(conversation, senderId);
 
     conversation.setLastMessage(message);
     conversationRepository.save(conversation);
@@ -198,6 +208,17 @@ public class MessageService {
     );
 
     return message;
+  }
+
+  private void restoreConversationForParticipants(MessageConversation conversation) {
+    conversation
+      .getParticipants()
+      .forEach(participant -> {
+        if (participant.getHiddenAt() != null) {
+          participant.setHiddenAt(null);
+          participantRepository.save(participant);
+        }
+      });
   }
 
   public MessageDto toDto(Message message) {
@@ -267,7 +288,8 @@ public class MessageService {
         MessageParticipant participant1 = new MessageParticipant();
         participant1.setConversation(conversation);
         participant1.setUser(user1);
-        participantRepository.save(participant1);
+        MessageParticipant savedParticipant1 = participantRepository.save(participant1);
+        conversation.getParticipants().add(savedParticipant1);
         log.info(
           "Participant {} added to conversation {}",
           user1.getUsername(),
@@ -277,7 +299,8 @@ public class MessageService {
         MessageParticipant participant2 = new MessageParticipant();
         participant2.setConversation(conversation);
         participant2.setUser(user2);
-        participantRepository.save(participant2);
+        MessageParticipant savedParticipant2 = participantRepository.save(participant2);
+        conversation.getParticipants().add(savedParticipant2);
         log.info(
           "Participant {} added to conversation {}",
           user2.getUsername(),
@@ -295,8 +318,16 @@ public class MessageService {
     return conversations
       .stream()
       .filter(c -> !c.isChannel())
+      .filter(c -> isVisibleForUser(c, userId))
       .map(c -> toDto(c, userId))
       .collect(Collectors.toList());
+  }
+
+  private boolean isVisibleForUser(MessageConversation conversation, Long userId) {
+    MessageParticipant self = findSelfParticipant(conversation, userId);
+    LocalDateTime hiddenAt = self.getHiddenAt();
+    if (hiddenAt == null) return true;
+    return messageRepository.existsByConversationIdAndCreatedAtAfter(conversation.getId(), hiddenAt);
   }
 
   private ConversationDto toDto(MessageConversation conversation, Long userId) {
@@ -324,12 +355,7 @@ public class MessageService {
         .collect(Collectors.toList())
     );
 
-    MessageParticipant self = conversation
-      .getParticipants()
-      .stream()
-      .filter(p -> p.getUser().getId().equals(userId))
-      .findFirst()
-      .orElseThrow(() -> new IllegalStateException("Participant not found in conversation"));
+    MessageParticipant self = findSelfParticipant(conversation, userId);
 
     LocalDateTime lastRead = self.getLastReadAt() == null
       ? LocalDateTime.of(1970, 1, 1, 0, 0)
@@ -393,15 +419,51 @@ public class MessageService {
     participantRepository.save(participant);
   }
 
+  private void markConversationAsReadIfParticipant(MessageConversation conversation, Long userId) {
+    conversation
+      .getParticipants()
+      .stream()
+      .filter(p -> p.getUser().getId().equals(userId))
+      .findFirst()
+      .ifPresent(participant -> {
+        participant.setLastReadAt(LocalDateTime.now());
+        participantRepository.save(participant);
+      });
+  }
+
+  @Transactional
+  public void hideReadConversation(Long conversationId, Long userId) {
+    MessageConversation conversation = conversationRepository
+      .findById(conversationId)
+      .orElseThrow(() -> new IllegalArgumentException("Conversation not found"));
+    if (conversation.isChannel()) {
+      throw new IllegalArgumentException("Channels cannot be hidden from the direct message list");
+    }
+    MessageParticipant participant = participantRepository
+      .findByConversationIdAndUserId(conversationId, userId)
+      .orElseThrow(() -> new IllegalArgumentException("Participant not found"));
+
+    LocalDateTime lastRead = getLastReadAt(participant);
+    long unreadCount = messageRepository.countByConversationIdAndCreatedAtAfterAndSenderIdNot(
+      conversationId,
+      lastRead,
+      userId
+    );
+    if (unreadCount > 0) {
+      throw new IllegalStateException("Unread conversations cannot be hidden");
+    }
+
+    participant.setHiddenAt(LocalDateTime.now());
+    participantRepository.save(participant);
+  }
+
   @Transactional(readOnly = true)
   public long getUnreadMessageCount(Long userId) {
     List<MessageParticipant> participations = participantRepository.findByUserId(userId);
     long totalUnreadCount = 0;
     for (MessageParticipant p : participations) {
       if (p.getConversation().isChannel()) continue;
-      LocalDateTime lastRead = p.getLastReadAt() == null
-        ? LocalDateTime.of(1970, 1, 1, 0, 0)
-        : p.getLastReadAt();
+      LocalDateTime lastRead = getLastReadAt(p);
       // 只计算别人发送给当前用户的未读消息
       totalUnreadCount += messageRepository.countByConversationIdAndCreatedAtAfterAndSenderIdNot(
         p.getConversation().getId(),
@@ -418,9 +480,7 @@ public class MessageService {
     long unreadChannelCount = 0;
     for (MessageParticipant p : participations) {
       if (!p.getConversation().isChannel()) continue;
-      LocalDateTime lastRead = p.getLastReadAt() == null
-        ? LocalDateTime.of(1970, 1, 1, 0, 0)
-        : p.getLastReadAt();
+      LocalDateTime lastRead = getLastReadAt(p);
       long unread = messageRepository.countByConversationIdAndCreatedAtAfterAndSenderIdNot(
         p.getConversation().getId(),
         lastRead,
@@ -431,5 +491,20 @@ public class MessageService {
       }
     }
     return unreadChannelCount;
+  }
+
+  private MessageParticipant findSelfParticipant(MessageConversation conversation, Long userId) {
+    return conversation
+      .getParticipants()
+      .stream()
+      .filter(p -> p.getUser().getId().equals(userId))
+      .findFirst()
+      .orElseThrow(() -> new IllegalStateException("Participant not found in conversation"));
+  }
+
+  private LocalDateTime getLastReadAt(MessageParticipant participant) {
+    return participant.getLastReadAt() == null
+      ? LocalDateTime.of(1970, 1, 1, 0, 0)
+      : participant.getLastReadAt();
   }
 }

@@ -82,6 +82,28 @@ export async function markNotificationsRead(ids) {
   }
 }
 
+export async function deleteReadNotifications() {
+  try {
+    const config = useRuntimeConfig()
+    const API_BASE_URL = config.public.apiBaseUrl
+
+    const token = getToken()
+    if (!token) return false
+    const res = await fetch(`${API_BASE_URL}/api/notifications/read`, {
+      method: 'DELETE',
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    })
+    if (!res.ok) return false
+    notifications.value = notifications.value.filter((n) => !n.read)
+    await fetchUnreadCount()
+    return true
+  } catch (e) {
+    return false
+  }
+}
+
 const MARK_ALL_FETCH_SIZE = 100
 const MARK_ALL_CHUNK_SIZE = 200
 const MARK_ALL_MAX_PAGES = 200

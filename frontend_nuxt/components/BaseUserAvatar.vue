@@ -6,12 +6,12 @@
     v-bind="wrapperAttrs"
     @click="handleClick"
   >
-    <BaseImage :src="props.src" :alt="altText" class="base-user-avatar-img" />
+    <BaseImage :src="resolvedSrc" :alt="altText" class="base-user-avatar-img" @error="useFallback" />
   </div>
 </template>
 
 <script setup>
-import { computed, watch } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { useAttrs } from 'vue'
 import BaseImage from './BaseImage.vue'
 
@@ -47,6 +47,8 @@ const props = defineProps({
 })
 
 const attrs = useAttrs()
+const fallbackAvatar = '/whu-emblem.webp'
+const failed = ref(false)
 
 const resolvedLink = computed(() => {
   if (props.to) return props.to
@@ -57,6 +59,18 @@ const resolvedLink = computed(() => {
 })
 
 const altText = computed(() => props.alt || '用户头像')
+const resolvedSrc = computed(() => (failed.value ? fallbackAvatar : props.src || fallbackAvatar))
+
+watch(
+  () => props.src,
+  () => {
+    failed.value = false
+  },
+)
+
+const useFallback = () => {
+  failed.value = true
+}
 
 const sizeStyle = computed(() => {
   var style = {}

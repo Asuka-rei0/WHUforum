@@ -34,9 +34,9 @@
         >
           <div class="conversation-avatar">
             <BaseUserAvatar
-              :src="getOtherParticipant(convo)?.avatar"
+              :src="getConversationAvatar(convo)"
               :user-id="getOtherParticipant(convo)?.id"
-              :alt="getOtherParticipant(convo)?.username || '用户'"
+              :alt="getConversationName(convo)"
               class="avatar-img"
               :disable-link="true"
             />
@@ -45,7 +45,7 @@
           <div class="conversation-content">
             <div class="conversation-header">
               <div class="participant-name">
-                {{ getOtherParticipant(convo)?.username || '未知用户' }}
+                {{ getConversationName(convo) }}
               </div>
               <div class="message-time">
                 {{ formatTime(convo.lastMessage?.createdAt || convo.createdAt) }}
@@ -60,8 +60,18 @@
                     : '暂无消息'
                 }}
               </div>
-              <div v-if="convo.unreadCount > 0" class="unread-count-badge">
-                {{ convo.unreadCount }}
+              <div class="conversation-actions">
+                <div v-if="convo.unreadCount > 0" class="unread-count-badge">
+                  {{ convo.unreadCount }}
+                </div>
+                <button
+                  v-else
+                  class="delete-read-button"
+                  type="button"
+                  @click.stop="hideConversation(convo.id)"
+                >
+                  删除
+                </button>
               </div>
             </div>
           </div>
@@ -84,7 +94,7 @@
           >
             <div class="conversation-avatar">
               <BaseImage
-                :src="ch.avatar"
+                :src="'/whu-emblem.webp'"
                 :alt="ch.name"
                 class="avatar-img"
                 @error="handleAvatarError"
@@ -94,7 +104,6 @@
               <div class="conversation-header">
                 <div class="participant-name">
                   {{ ch.name }}
-                  <span v-if="ch.unreadCount > 0" class="unread-dot"></span>
                 </div>
                 <div class="message-time">
                   {{ formatTime(ch.lastMessage?.createdAt || ch.createdAt) }}
@@ -108,7 +117,10 @@
                       : ch.description
                   }}
                 </div>
-                <div class="member-count">成员 {{ ch.memberCount }}</div>
+                <div class="channel-meta">
+                  <div v-if="ch.unreadCount > 0" class="unread-dot"></div>
+                  <div class="member-count">成员 {{ ch.memberCount }}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -172,7 +184,7 @@ async function fetchConversations() {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
     const data = await response.json()
-    conversations.value = data
+    conversations.value = Array.isArray(data) ? data.filter((convo) => convo?.channel !== true) : []
   } catch (e) {
     error.value = '无法加载会话列表。'
   } finally {
@@ -183,7 +195,18 @@ async function fetchConversations() {
 // 获取对话中的另一个参与者（非当前用户）
 function getOtherParticipant(conversation) {
   if (!currentUser.value || !conversation.participants) return null
-  return conversation.participants.find((p) => p.id !== currentUser.value.id)
+  return conversation.participants.find((p) => Number(p.id) !== Number(currentUser.value.id)) || null
+}
+
+function getConversationName(conversation) {
+  const other = getOtherParticipant(conversation)
+  if (other?.username) return other.username
+  return conversation.name || '校园消息'
+}
+
+function getConversationAvatar(conversation) {
+  const other = getOtherParticipant(conversation)
+  return other?.avatar || conversation.avatar || '/whu-emblem.webp'
 }
 
 // 格式化时间
@@ -194,7 +217,7 @@ function formatTime(timeString) {
 
 // 头像加载失败处理
 function handleAvatarError(event) {
-  event.target.src = null
+  event.target.src = '/whu-emblem.webp'
 }
 
 async function fetchChannels() {
@@ -248,6 +271,25 @@ async function goToChannel(id) {
   }
 }
 
+async function hideConversation(id) {
+  const token = getToken()
+  if (!token) {
+    toast.error('请先登录')
+    return
+  }
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/messages/conversations/${id}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!response.ok) throw new Error('hide failed')
+    conversations.value = conversations.value.filter((convo) => convo.id !== id)
+    refreshGlobalUnreadCount()
+  } catch (e) {
+    toast.error('删除失败，请确认该会话已读后再试')
+  }
+}
+
 onActivated(async () => {
   currentUser.value = await fetchCurrentUser()
 
@@ -282,9 +324,18 @@ const subscribeToUserMessages = () => {
     if (activeTab.value === 'messages') {
       fetchConversations()
     }
-    fetchChannels()
-    refreshGlobalUnreadCount()
-    refreshChannelUnread()
+    const parsed = (() => {
+      try {
+        return JSON.parse(message.body)
+      } catch {
+        return null
+      }
+    })()
+    if (!parsed || parsed.sender?.id !== currentUser.value?.id) {
+      fetchChannels()
+      refreshGlobalUnreadCount()
+      refreshChannelUnread()
+    }
   })
 }
 
@@ -498,6 +549,29 @@ function minimize() {
   border-radius: 12px;
   line-height: 1.5;
   flex-shrink: 0;
+}
+
+.conversation-actions,
+.channel-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.delete-read-button {
+  border: none;
+  background: transparent;
+  color: gray;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 0;
+  white-space: nowrap;
+}
+
+.delete-read-button:hover {
+  color: var(--primary-color);
+  text-decoration: underline;
 }
 
 .unread-dot {

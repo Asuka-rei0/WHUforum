@@ -20,6 +20,7 @@ const props = defineProps({
   src: { type: String, default: '' },
   alt: { type: String, default: '' },
 })
+const emit = defineEmits(['error'])
 
 const attrs = useAttrs()
 
@@ -38,6 +39,11 @@ const placeholder = computed(() => {
 
 function onLoad() {
   loaded.value = true
+}
+
+function onError(event) {
+  loaded.value = false
+  emit('error', event)
 }
 </script>
 

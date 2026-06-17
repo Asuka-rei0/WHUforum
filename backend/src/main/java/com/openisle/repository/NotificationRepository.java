@@ -68,4 +68,6 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     Comment comment,
     ReactionType reactionType
   );
+
+  void deleteByUserAndRead(User user, boolean read);
 }

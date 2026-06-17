@@ -1,6 +1,7 @@
 package com.openisle.repository;
 
 import com.openisle.model.Message;
+import java.time.LocalDateTime;
 import java.util.List;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,15 +14,14 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
   Page<Message> findByConversationId(Long conversationId, Pageable pageable);
 
-  long countByConversationIdAndCreatedAtAfter(
-    Long conversationId,
-    java.time.LocalDateTime createdAt
-  );
+  long countByConversationIdAndCreatedAtAfter(Long conversationId, LocalDateTime createdAt);
+
+  boolean existsByConversationIdAndCreatedAtAfter(Long conversationId, LocalDateTime createdAt);
 
   // 只计算不是指定用户发送的消息（即别人发给当前用户的消息）
   long countByConversationIdAndCreatedAtAfterAndSenderIdNot(
     Long conversationId,
-    java.time.LocalDateTime createdAt,
+    LocalDateTime createdAt,
     Long senderId
   );
 }

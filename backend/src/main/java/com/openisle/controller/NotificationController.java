@@ -101,6 +101,14 @@ public class NotificationController {
     notificationService.markRead(auth.getName(), req.getIds());
   }
 
+  @DeleteMapping("/read")
+  @Operation(summary = "Delete read notifications", description = "Delete read notifications")
+  @ApiResponse(responseCode = "200", description = "Read notifications deleted")
+  @SecurityRequirement(name = "JWT")
+  public void deleteRead(Authentication auth) {
+    notificationService.deleteRead(auth.getName());
+  }
+
   @GetMapping("/prefs")
   @Operation(summary = "List preferences", description = "List notification preferences")
   @ApiResponse(

@@ -136,6 +136,21 @@ public class MessageController {
     return ResponseEntity.ok().build();
   }
 
+  @DeleteMapping("/conversations/{conversationId}")
+  @Operation(
+    summary = "Hide read conversation",
+    description = "Hide a read direct message conversation from the list"
+  )
+  @ApiResponse(responseCode = "200", description = "Conversation hidden")
+  @SecurityRequirement(name = "JWT")
+  public ResponseEntity<Void> hideConversation(
+    @PathVariable Long conversationId,
+    Authentication auth
+  ) {
+    messageService.hideReadConversation(conversationId, getCurrentUserId(auth));
+    return ResponseEntity.ok().build();
+  }
+
   @PostMapping("/conversations")
   @Operation(
     summary = "Find or create conversation",

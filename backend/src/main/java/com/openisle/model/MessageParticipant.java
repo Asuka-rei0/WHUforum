@@ -29,4 +29,7 @@ public class MessageParticipant {
 
   @Column
   private LocalDateTime lastReadAt;
+
+  @Column
+  private LocalDateTime hiddenAt;
 }

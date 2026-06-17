@@ -390,6 +390,8 @@ async function sendMessage(content, clearInput) {
     // 仅“发送消息成功后”才平滑滚动到底部
     scrollToBottomSmooth()
     newMessagesCount.value = 0
+    refreshGlobalUnreadCount()
+    refreshChannelUnread()
   } catch (e) {
     toast.error('消息发送失败，请稍后重试')
   } finally {

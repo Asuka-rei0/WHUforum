@@ -3,6 +3,10 @@
     <BaseTabs v-model="selectedTab" :tabs="tabs">
       <template #right>
         <div class="message-page-header-right">
+          <div class="message-page-header-right-item danger" @click="removeReadNotifications">
+            <clear-icon class="message-page-header-right-item-button-icon" />
+            <span class="message-page-header-right-item-button-text"> 删除已读消息 </span>
+          </div>
           <div class="message-page-header-right-item" @click="markAllRead">
             <check-correct class="message-page-header-right-item-button-icon" />
             <span class="message-page-header-right-item-button-text"> 已读所有消息 </span>
@@ -691,6 +695,7 @@ import {
   markNotificationRead,
   notifications,
   markAllRead,
+  deleteReadNotifications as deleteReadNotificationItems,
   hasMore,
   fetchNotificationPreferences,
   updateNotificationPreference,
@@ -788,6 +793,17 @@ const markRead = async (id) => {
   if (selectedTab.value === 'unread') {
     const index = notifications.value.findIndex((n) => n.id === id)
     if (index !== -1) notifications.value.splice(index, 1)
+  }
+}
+
+const removeReadNotifications = async () => {
+  const ok = await deleteReadNotificationItems()
+  if (ok) {
+    await fetchNotifications({ page: 0, size: pageSize, unread: selectedTab.value === 'unread' })
+    await fetchUnreadCount()
+    toast.success('已删除已读消息')
+  } else {
+    toast.error('删除失败')
   }
 }
 
@@ -907,6 +923,7 @@ const loadCurrentTab = async () => {
   await fetchNotifications({ page: 0, size: pageSize, unread: selectedTab.value === 'unread' })
 }
 
+
 onMounted(loadCurrentTab)
 onActivated(loadCurrentTab)
 </script>
@@ -928,6 +945,8 @@ onActivated(loadCurrentTab)
   display: flex;
   flex-direction: row;
   align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .message-page-header-right-item {
@@ -938,6 +957,10 @@ onActivated(loadCurrentTab)
   color: var(--primary-color);
   padding-right: 10px;
   gap: 5px;
+}
+
+.message-page-header-right-item.danger {
+  color: #d4380d;
 }
 
 .message-page-header-right-item-button-icon {

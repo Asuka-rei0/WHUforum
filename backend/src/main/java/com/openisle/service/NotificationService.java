@@ -343,6 +343,14 @@ public class NotificationService {
     notificationRepository.saveAll(notifs);
   }
 
+  @Transactional
+  public void deleteRead(String username) {
+    User user = userRepository
+      .findByUsername(username)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+    notificationRepository.deleteByUserAndRead(user, true);
+  }
+
   public long countUnread(String username) {
     User user = userRepository
       .findByUsername(username)
