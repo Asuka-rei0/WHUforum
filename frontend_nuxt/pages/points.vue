@@ -33,8 +33,8 @@
           </div>
 
           <section class="goods">
-            <div class="goods-item" v-for="(good, idx) in goods" :key="idx">
-              <BaseImage class="goods-item-image" :src="good.image" alt="good.name" />
+            <div class="goods-item" v-for="(good, idx) in displayGoods" :key="idx">
+              <BaseImage class="goods-item-image" :src="good.image" :alt="good.name" />
               <div class="goods-item-name">{{ good.name }}</div>
               <div class="goods-item-cost">
                 <paper-money-two />
@@ -42,7 +42,7 @@
               </div>
               <div
                 class="goods-item-button"
-                :class="{ disabled: !authState.loggedIn || point === null || point < good.cost }"
+                :class="{ disabled: !good.id || !authState.loggedIn || point === null || point < good.cost }"
                 @click="openRedeem(good)"
               >
                 兑换
@@ -150,11 +150,11 @@
                   按赞，获得{{ item.amount }}积分
                 </template>
                 <template v-else-if="item.type === 'INVITE' && item.fromUserId">
-                  邀请了好友
+                  社区奖励
                   <NuxtLink :to="`/users/${item.fromUserId}`" class="timeline-link">{{
                     item.fromUserName
                   }}</NuxtLink>
-                  加入社区 🎉，获得 {{ item.amount }} 积分
+                  加入社区，获得 {{ item.amount }} 积分
                 </template>
                 <template v-else-if="item.type === 'FEATURE'">
                   文章
@@ -218,7 +218,7 @@
 </template>
 
 <script setup>
-import { onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { authState, fetchCurrentUser, getToken } from '~/utils/auth'
 import { toast } from '~/main'
 import RedeemPopup from '~/components/RedeemPopup.vue'
@@ -248,7 +248,6 @@ const pointRules = [
   '评论：每天前四条评论可获 10 积分，你的帖子被评论也可获 10 积分',
   '帖子被点赞：每次 10 积分',
   '评论被点赞：每次 10 积分',
-  '邀请好友加入可获得 500 积分/次，注意需要使用邀请链接注册',
   '文章被收录至精选：每次 500 积分',
 ]
 
@@ -274,6 +273,31 @@ const iconMap = {
   POST_LIKE_CANCELLED: 'clear-icon',
   COMMENT_LIKE_CANCELLED: 'clear-icon',
 }
+
+const campusGoods = [
+  {
+    name: '校园网网费 1 个月',
+    cost: 3000,
+    image: 'https://img.icons8.com/color/240/wifi--v1.png',
+  },
+  {
+    name: '食堂餐券 20 元',
+    cost: 2000,
+    image: 'https://img.icons8.com/color/240/meal.png',
+  },
+  {
+    name: '图书馆打印券 50 页',
+    cost: 1200,
+    image: 'https://img.icons8.com/color/240/print.png',
+  },
+]
+
+const legacyGoodNames = new Set(['GPT Plus 1 个月', '奶茶'])
+const displayGoods = computed(() => {
+  const visibleGoods = goods.value.filter((good) => !legacyGoodNames.has(good.name))
+  if (visibleGoods.length > 0) return visibleGoods
+  return campusGoods.map((good, index) => ({ id: null, ...good, fallbackKey: `campus-${index}` }))
+})
 
 const loadTrend = async () => {
   if (!authState.loggedIn) return
@@ -341,6 +365,10 @@ const loadHistory = async () => {
 }
 
 const openRedeem = (good) => {
+  if (!good.id) {
+    toast.error('该奖品暂未开放兑换')
+    return
+  }
   if (!authState.loggedIn || point.value === null || point.value < good.cost) {
     toast.error('积分不足')
     return
@@ -447,6 +475,7 @@ const submitRedeem = async () => {
 .goods {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
 }
 
 .goods-item {
@@ -468,6 +497,8 @@ const submitRedeem = async () => {
   width: 200px;
   height: 200px;
   border-bottom: 1px solid var(--normal-border-color);
+  object-fit: contain;
+  background: var(--background-color);
 }
 
 .goods-item-cost {

@@ -14,9 +14,10 @@
         <div class="message-control-container">
           <div class="message-control-title">通知设置</div>
           <div class="message-control-item-container">
-            <template v-for="pref in notificationPrefs">
+            <div v-if="prefsLoading" class="message-control-empty">加载中...</div>
+            <template v-else-if="visibleNotificationPrefs.length">
               <div
-                v-if="canShowNotification(pref.type)"
+                v-for="pref in visibleNotificationPrefs"
                 :key="pref.type"
                 class="message-control-item"
               >
@@ -27,18 +28,23 @@
                 />
               </div>
             </template>
+            <div v-else class="message-control-empty">暂无可设置的通知项</div>
           </div>
         </div>
         <div class="message-control-container">
           <div class="message-control-title">邮件通知设置</div>
           <div class="message-control-item-container">
-            <div v-for="pref in emailPrefs" :key="pref.type" class="message-control-item">
-              <div class="message-control-item-label">{{ formatType(pref.type) }}</div>
-              <BaseSwitch
-                :model-value="pref.enabled"
-                @update:modelValue="(val) => toggleEmailPref(pref, val)"
-              />
-            </div>
+            <div v-if="prefsLoading" class="message-control-empty">加载中...</div>
+            <template v-else-if="emailPrefs.length">
+              <div v-for="pref in emailPrefs" :key="pref.type" class="message-control-item">
+                <div class="message-control-item-label">{{ formatType(pref.type) }}</div>
+                <BaseSwitch
+                  :model-value="pref.enabled"
+                  @update:modelValue="(val) => toggleEmailPref(pref, val)"
+                />
+              </div>
+            </template>
+            <div v-else class="message-control-empty">暂无可设置的邮件通知项</div>
           </div>
         </div>
       </div>
@@ -669,7 +675,7 @@
 </template>
 
 <script setup>
-import { ref, watch, onActivated } from 'vue'
+import { computed, onActivated, onMounted, ref, watch } from 'vue'
 import BasePlaceholder from '~/components/BasePlaceholder.vue'
 import BaseTimeline from '~/components/BaseTimeline.vue'
 import NotificationContainer from '~/components/NotificationContainer.vue'
@@ -707,8 +713,13 @@ const tabs = [
 ]
 const notificationPrefs = ref([])
 const emailPrefs = ref([])
+const prefsLoading = ref(false)
 const page = ref(0)
 const pageSize = 30
+
+const visibleNotificationPrefs = computed(() =>
+  notificationPrefs.value.filter((pref) => canShowNotification(pref.type)),
+)
 
 const loadMore = async () => {
   if (!hasMore.value) return true
@@ -724,6 +735,10 @@ const loadMore = async () => {
 
 watch(selectedTab, async (tab) => {
   page.value = 0
+  if (tab === 'control') {
+    await loadPreferences()
+    return
+  }
   await fetchNotifications({ page: 0, size: pageSize, unread: tab === 'unread' })
 })
 
@@ -733,6 +748,15 @@ const fetchPrefs = async () => {
 
 const fetchEmailPrefs = async () => {
   emailPrefs.value = await fetchEmailNotificationPreferences()
+}
+
+const loadPreferences = async () => {
+  prefsLoading.value = true
+  try {
+    await Promise.all([fetchPrefs(), fetchEmailPrefs()])
+  } finally {
+    prefsLoading.value = false
+  }
 }
 
 const togglePref = async (pref, value) => {
@@ -874,12 +898,17 @@ const canShowNotification = (type) => {
   return !needAdminSet.has(type) || isAdmin.value
 }
 
-onActivated(async () => {
+const loadCurrentTab = async () => {
   page.value = 0
+  if (selectedTab.value === 'control') {
+    await loadPreferences()
+    return
+  }
   await fetchNotifications({ page: 0, size: pageSize, unread: selectedTab.value === 'unread' })
-  fetchPrefs()
-  fetchEmailPrefs()
-})
+}
+
+onMounted(loadCurrentTab)
+onActivated(loadCurrentTab)
 </script>
 
 <style scoped>
@@ -1023,11 +1052,18 @@ onActivated(async () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  max-width: 200px;
+  max-width: 320px;
+  gap: 20px;
 }
 
 .message-control-item-label {
   font-size: 14px;
+}
+
+.message-control-empty {
+  color: var(--text-color);
+  font-size: 14px;
+  opacity: 0.65;
 }
 
 @media (max-width: 768px) {

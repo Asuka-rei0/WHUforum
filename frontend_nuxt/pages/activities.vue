@@ -25,7 +25,6 @@
         </div>
       </div>
       <MilkTeaActivityComponent v-if="a.type === 'MILK_TEA'" />
-      <InviteCodeActivityComponent v-if="a.type === 'INVITE_POINTS'" />
     </div>
   </div>
 </template>
@@ -33,7 +32,6 @@
 <script setup>
 import TimeManager from '~/utils/time'
 import MilkTeaActivityComponent from '~/components/MilkTeaActivityComponent.vue'
-import InviteCodeActivityComponent from '~/components/InviteCodeActivityComponent.vue'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
 
@@ -45,7 +43,10 @@ onMounted(async () => {
   try {
     const res = await fetch(`${API_BASE_URL}/api/activities`)
     if (res.ok) {
-      activities.value = await res.json()
+      const list = await res.json()
+      activities.value = Array.isArray(list)
+        ? list.filter((activity) => activity.type !== 'INVITE_POINTS')
+        : []
     }
   } catch (e) {
     console.error(e)

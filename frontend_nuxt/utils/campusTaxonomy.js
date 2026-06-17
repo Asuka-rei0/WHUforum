@@ -2,9 +2,10 @@ export const CAMPUS_CATEGORY_TAGS = Object.freeze({
   教务公告: ['选课', '考试', '课程经验', '教务通知', '奖助学金'],
   学术交流: ['讲座', '科研', '论文', '竞赛', '升学'],
   跳蚤市场: ['出闲置', '求购', '教材', '数码', '生活用品'],
-  树洞互助: ['树洞', '求助', '寻物', '互助', '校园安全'],
   校园生活: ['食堂', '宿舍', '社团', '运动', '校园活动'],
 })
+
+export const HIDDEN_POST_CATEGORY_NAMES = Object.freeze(['树洞互助'])
 
 export const CAMPUS_CATEGORY_NAMES = Object.freeze(Object.keys(CAMPUS_CATEGORY_TAGS))
 export const CAMPUS_TAG_NAMES = Object.freeze([
@@ -17,9 +18,13 @@ export const getCategoryTagNames = (categoryName) =>
   CAMPUS_CATEGORY_TAGS[normalizeTaxonomyName(categoryName)] || []
 
 export const isPlaceholderTaxonomy = (item) => /^测试用/.test(item?.name || '')
+export const isHiddenPostCategory = (item) =>
+  HIDDEN_POST_CATEGORY_NAMES.includes(normalizeTaxonomyName(item?.name))
 
 export const filterCampusTaxonomy = (items) =>
-  Array.isArray(items) ? items.filter((item) => !isPlaceholderTaxonomy(item)) : []
+  Array.isArray(items)
+    ? items.filter((item) => !isPlaceholderTaxonomy(item) && !isHiddenPostCategory(item))
+    : []
 
 export const findCategoryById = (categories, categoryId) => {
   if (categoryId == null || categoryId === '') return null

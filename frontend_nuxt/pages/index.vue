@@ -167,7 +167,7 @@ useHead({
     {
       name: 'description',
       content:
-        '珞珈论坛是面向武汉大学师生和校友的校园交流社区，支持课程讨论、校园生活、跳蚤市场、树洞互助与活动信息分享。',
+        '珞珈论坛是面向武汉大学师生和校友的校园交流社区，支持课程讨论、校园生活、跳蚤市场、匿名树洞与活动信息分享。',
     },
   ],
 })
@@ -328,7 +328,8 @@ const loadOptions = async () => {
       const res = await fetch(`${API_BASE_URL}/api/categories/`)
       if (res.ok) {
         const category = await res.json()
-        categoryOptions.value = isPlaceholderTaxonomy(category) ? [] : [category]
+        categoryOptions.value =
+          isPlaceholderTaxonomy(category) || category?.name === '树洞互助' ? [] : [category]
       }
     } catch {}
   }

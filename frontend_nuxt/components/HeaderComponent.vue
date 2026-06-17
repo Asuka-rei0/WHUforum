@@ -40,16 +40,6 @@
               <span class="header-label">主题</span>
             </div>
           </ToolTip>
-          <!-- 邀请 -->
-          <ToolTip v-if="!isMobile" content="邀请好友" placement="bottom">
-            <div class="header-icon-item" @click="copyInviteLink">
-              <template v-if="!isCopying">
-                <copy-link class="header-icon" />
-                <span class="header-label">邀请</span>
-              </template>
-              <loading v-else />
-            </div>
-          </ToolTip>
           <!-- 在线人数 -->
           <ToolTip v-if="!isMobile" content="当前在线人数" placement="bottom">
             <div class="header-icon-item">
@@ -123,10 +113,8 @@ import { useChannelsUnreadCount } from '~/composables/useChannelsUnreadCount'
 import { useIsMobile } from '~/utils/screen'
 import { themeState, cycleTheme, ThemeMode } from '~/utils/theme'
 import { toast } from '~/main'
-import { getApiErrorMessage } from '~/utils/apiError'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
-const WEBSITE_BASE_URL = config.public.websiteBaseUrl
 
 const props = defineProps({
   showMenuBtn: {
@@ -143,7 +131,6 @@ const showSearch = ref(false)
 const searchDropdown = ref(null)
 const userMenu = ref(null)
 const menuBtn = ref(null)
-const isCopying = ref(false)
 const onlineCount = ref(0)
 
 const ensureCurrentUser = async () => {
@@ -208,50 +195,14 @@ const goToSettings = () => {
   navigateTo('/settings', { replace: true })
 }
 
-const copyInviteLink = async () => {
-  isCopying.value = true
-  const token = getToken()
-  if (!token) {
-    toast.error('请先登录')
-    isCopying.value = false // 🔥 修复：未登录时立即复原状态
-    return
-  }
-  try {
-    const res = await fetch(`${API_BASE_URL}/api/invite/generate`, {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
-    })
-    if (res.ok) {
-      const data = await res.json()
-      const inviteLink = data.token ? `${WEBSITE_BASE_URL}/signup?invite_token=${data.token}` : ''
-      /**
-       * navigator.clipboard在webkit中有点奇怪的行为
-       * https://stackoverflow.com/questions/62327358/javascript-clipboard-api-safari-ios-notallowederror-message
-       * https://webkit.org/blog/10247/new-webkit-features-in-safari-13-1/
-       */
-      setTimeout(() => {
-        navigator.clipboard
-          .writeText(inviteLink)
-          .then(() => {
-            toast.success('邀请链接已复制')
-          })
-          .catch(() => {
-            toast.error('邀请链接复制失败')
-          })
-      }, 0)
-    } else {
-      const data = await res.json().catch(() => ({}))
-      toast.error(getApiErrorMessage(data, '生成邀请链接失败，请稍后重试'))
-    }
-  } catch (e) {
-    toast.error('生成邀请链接失败')
-  } finally {
-    isCopying.value = false
-  }
-}
-
 const copyRssLink = async () => {
-  toast.info('RSS 公开订阅已因校园隐私保护暂停')
+  const rssLink = `${API_BASE_URL.replace(/\/$/, '')}/api/rss`
+  try {
+    await navigator.clipboard.writeText(rssLink)
+    toast.success('RSS 订阅链接已复制')
+  } catch (e) {
+    toast.info(`RSS 订阅链接：${rssLink}`)
+  }
 }
 
 const goToProfile = async () => {
@@ -472,12 +423,6 @@ onMounted(async () => {
   cursor: pointer;
 }
 
-.invite_text:hover {
-  opacity: 0.8;
-  text-decoration: underline;
-}
-
-.invite_text,
 .online-count,
 .rss-icon,
 .new-post-icon,

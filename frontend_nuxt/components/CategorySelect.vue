@@ -29,6 +29,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue'
 import Dropdown from '~/components/Dropdown.vue'
+import { filterCampusTaxonomy } from '~/utils/campusTaxonomy'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
 
@@ -38,9 +39,6 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['update:modelValue'])
-const isPlaceholderTaxonomy = (item) => /^测试用/.test(item?.name || '')
-const filterCampusTaxonomy = (items) =>
-  Array.isArray(items) ? items.filter((item) => !isPlaceholderTaxonomy(item)) : []
 
 const providedOptions = ref(Array.isArray(props.options) ? [...props.options] : [])
 watch(

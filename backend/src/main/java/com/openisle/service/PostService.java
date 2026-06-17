@@ -93,6 +93,9 @@ public class PostService {
   @Value("${app.website-url:https://www.open-isle.com}")
   private String websiteUrl;
 
+  @Value("${app.post.create-cooldown-seconds:30}")
+  private long postCreateCooldownSeconds;
+
   private final RedisTemplate redisTemplate;
 
   @org.springframework.beans.factory.annotation.Autowired
@@ -591,8 +594,11 @@ public class PostService {
    * @param username
    */
   private void markPostLimit(String username) {
+    if (postCreateCooldownSeconds <= 0) {
+      return;
+    }
     String key = CachingConfig.LIMIT_CACHE_NAME + ":posts:" + username;
-    redisTemplate.opsForValue().set(key, "1", Duration.ofMinutes(5));
+    redisTemplate.opsForValue().set(key, "1", Duration.ofSeconds(postCreateCooldownSeconds));
   }
 
   @CacheEvict(value = CachingConfig.POST_CACHE_NAME, allEntries = true)

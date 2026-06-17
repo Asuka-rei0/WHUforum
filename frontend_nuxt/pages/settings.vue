@@ -197,7 +197,7 @@ const fetchAiLimits = () => {
 const fetchRegisterModes = () => {
   return Promise.resolve([
     { id: 'DIRECT', name: '直接注册', icon: 'send-icon' },
-    { id: 'WHITELIST', name: '白名单邀请制', icon: 'search-icon' },
+    { id: 'WHITELIST', name: '白名单审核制', icon: 'search-icon' },
   ])
 }
 const loadAdminConfig = async () => {

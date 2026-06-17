@@ -148,6 +148,7 @@ public class SecurityConfig {
             "/api/posts/latest-reply",
             "/api/posts/featured",
             "/api/posts/recent",
+            "/api/rss",
             "/api/treeholes/square"
           )
           .permitAll()
@@ -225,6 +226,7 @@ public class SecurityConfig {
             uri.equals("/api/posts/latest-reply") ||
             uri.equals("/api/posts/featured") ||
             uri.equals("/api/posts/recent") ||
+            uri.equals("/api/rss") ||
             uri.equals("/api/treeholes/square") ||
             uri.startsWith("/api/reaction-types") ||
             uri.startsWith("/api/config") ||
