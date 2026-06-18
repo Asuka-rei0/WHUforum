@@ -170,8 +170,6 @@ public class SecurityConfig {
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/online/**")
           .permitAll()
-          .requestMatchers(HttpMethod.POST, "/api/online/**")
-          .permitAll()
           .requestMatchers(HttpMethod.GET, "/api/point-goods")
           .permitAll()
           .requestMatchers(HttpMethod.POST, "/api/point-goods")
@@ -268,7 +266,7 @@ public class SecurityConfig {
           !uri.startsWith("/api/ws") &&
           !uri.startsWith("/api/sockjs") &&
           !uri.startsWith("/api/v3/api-docs") &&
-          !uri.startsWith("/api/online")
+          !("GET".equalsIgnoreCase(request.getMethod()) && uri.startsWith("/api/online"))
         ) {
           response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
           response.setContentType("application/json");

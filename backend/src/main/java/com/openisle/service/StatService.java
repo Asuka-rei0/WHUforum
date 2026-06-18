@@ -1,8 +1,14 @@
 package com.openisle.service;
 
 import com.openisle.repository.CommentRepository;
+import com.openisle.repository.ContentReportRepository;
 import com.openisle.repository.PostRepository;
+import com.openisle.repository.TreeholeInterventionCaseRepository;
 import com.openisle.repository.UserRepository;
+import com.openisle.dto.AdminDashboardStatsDto;
+import com.openisle.model.ContentReportStatus;
+import com.openisle.model.PostStatus;
+import com.openisle.model.TreeholeInterventionStatus;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -16,6 +22,8 @@ public class StatService {
   private final UserRepository userRepository;
   private final PostRepository postRepository;
   private final CommentRepository commentRepository;
+  private final ContentReportRepository contentReportRepository;
+  private final TreeholeInterventionCaseRepository treeholeInterventionCaseRepository;
 
   private Map<LocalDate, Long> toDateMap(
     LocalDate start,
@@ -64,5 +72,19 @@ public class StatService {
       end.plusDays(1).atStartOfDay()
     );
     return toDateMap(start, end, list);
+  }
+
+  public AdminDashboardStatsDto adminDashboardStats() {
+    AdminDashboardStatsDto dto = new AdminDashboardStatsDto();
+    dto.setUsers(userRepository.count());
+    dto.setPosts(postRepository.count());
+    dto.setComments(commentRepository.count());
+    dto.setOpenReports(contentReportRepository.countByStatus(ContentReportStatus.OPEN));
+    dto.setReviewingReports(contentReportRepository.countByStatus(ContentReportStatus.REVIEWING));
+    dto.setPendingPosts(postRepository.countByStatus(PostStatus.PENDING));
+    dto.setOpenTreeholeCases(
+      treeholeInterventionCaseRepository.countByStatus(TreeholeInterventionStatus.OPEN)
+    );
+    return dto;
   }
 }

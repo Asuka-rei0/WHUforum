@@ -273,8 +273,10 @@ import { useIsMobile } from '~/utils/screen'
 import Dropdown from '~/components/Dropdown.vue'
 import { ClientOnly } from '#components'
 import { useConfirm } from '~/composables/useConfirm'
+import { useContentReport } from '~/composables/useContentReport'
 import { Lock } from '@icon-park/vue-next'
 const { confirm } = useConfirm()
+const { submitReport } = useContentReport()
 
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
@@ -407,6 +409,9 @@ const articleMenuItems = computed(() => {
   if (isAdmin.value && status.value === 'PENDING') {
     items.push({ text: '通过审核', onClick: () => approvePost() })
     items.push({ text: '驳回', color: 'red', onClick: () => rejectPost() })
+  }
+  if (loggedIn.value) {
+    items.push({ text: '举报帖子', color: 'red', onClick: () => reportPost() })
   }
   return items
 })
@@ -739,6 +744,14 @@ const postComment = async (parentUserName, text, clear) => {
 const copyPostLink = () => {
   navigator.clipboard.writeText(location.href.split('#')[0]).then(() => {
     toast.success('已复制')
+  })
+}
+
+const reportPost = async () => {
+  await submitReport({
+    targetType: author.value?.anonymous ? 'TREEHOLE' : 'POST',
+    targetId: Number(postId),
+    reason: 'OTHER',
   })
 }
 

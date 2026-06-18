@@ -60,4 +60,6 @@ public enum NotificationType {
   FLEA_MARKET_STATUS,
   /** A moderation rule flagged content for admin review */
   MODERATION_ALERT,
+  /** A user submitted a content report for admin review */
+  CONTENT_REPORT,
 }

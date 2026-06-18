@@ -84,6 +84,24 @@ public class User {
   @Column(name = "campus_verified", nullable = false)
   private boolean campusVerified = false;
 
+  @Column(name = "show_campus_identity", nullable = false)
+  private boolean showCampusIdentity = true;
+
+  @Column(name = "show_department", nullable = false)
+  private boolean showDepartment = true;
+
+  @Column(name = "notification_site_enabled", nullable = false)
+  private boolean notificationSiteEnabled = true;
+
+  @Column(name = "notification_email_enabled", nullable = false)
+  private boolean notificationEmailEnabled = true;
+
+  @Column(name = "notification_push_enabled", nullable = false)
+  private boolean notificationPushEnabled = true;
+
+  @Column(name = "notification_digest_frequency", nullable = false, length = 20)
+  private String notificationDigestFrequency = "NONE";
+
   @Enumerated(EnumType.STRING)
   private MedalType displayMedal;
 

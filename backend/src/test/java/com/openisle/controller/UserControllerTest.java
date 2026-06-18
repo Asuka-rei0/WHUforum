@@ -162,6 +162,40 @@ class UserControllerTest {
   }
 
   @Test
+  void updateProfileWithPrivacySettings() throws Exception {
+    User user = new User();
+    user.setId(1L);
+    user.setUsername("alice2");
+    user.setShowCampusIdentity(false);
+    user.setShowDepartment(true);
+    UserDto dto = new UserDto();
+    dto.setId(1L);
+    dto.setUsername("alice2");
+    dto.setShowCampusIdentity(false);
+    dto.setShowDepartment(true);
+    Mockito.when(
+      userService.updateProfile("alice", "alice2", "hi", false, true)
+    )
+      .thenReturn(user);
+    Mockito.when(jwtService.generateToken("alice2")).thenReturn("token2");
+    Mockito.when(userMapper.toDto(eq(user), any())).thenReturn(dto);
+
+    mockMvc
+      .perform(
+        put("/api/users/me")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+            "{\"username\":\"alice2\",\"introduction\":\"hi\",\"showCampusIdentity\":false,\"showDepartment\":true}"
+          )
+          .principal(new UsernamePasswordAuthenticationToken("alice", "p"))
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.token").value("token2"))
+      .andExpect(jsonPath("$.user.showCampusIdentity").value(false))
+      .andExpect(jsonPath("$.user.showDepartment").value(true));
+  }
+
+  @Test
   void deleteCurrentUserWithPassword() throws Exception {
     mockMvc
       .perform(

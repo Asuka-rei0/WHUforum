@@ -2,6 +2,7 @@ package com.openisle.controller;
 
 import com.openisle.service.StatService;
 import com.openisle.service.UserVisitService;
+import com.openisle.dto.AdminDashboardStatsDto;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.ArraySchema;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -123,5 +124,16 @@ public class StatController {
       .stream()
       .map(e -> Map.<String, Object>of("date", e.getKey().toString(), "value", e.getValue()))
       .toList();
+  }
+
+  @GetMapping("/admin-dashboard")
+  @Operation(summary = "Admin dashboard stats", description = "Get moderation and growth summary")
+  @ApiResponse(
+    responseCode = "200",
+    description = "Admin dashboard stats",
+    content = @Content(schema = @Schema(implementation = AdminDashboardStatsDto.class))
+  )
+  public AdminDashboardStatsDto adminDashboard() {
+    return statService.adminDashboardStats();
   }
 }

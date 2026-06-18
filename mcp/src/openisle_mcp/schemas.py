@@ -418,3 +418,80 @@ class NotificationCleanupResult(BaseModel):
     total_marked: int = Field(
         description="Total number of notifications successfully marked as read.",
     )
+
+
+class ContentReportData(BaseModel):
+    """Moderation report payload returned by the backend."""
+
+    id: Optional[int] = Field(default=None, description="Report identifier.")
+    target_type: Optional[str] = Field(
+        default=None,
+        alias="targetType",
+        description="Reported target type: POST, COMMENT, MESSAGE, or TREEHOLE.",
+    )
+    target_id: Optional[int] = Field(
+        default=None,
+        alias="targetId",
+        description="Identifier of the reported target.",
+    )
+    reason: Optional[str] = Field(default=None, description="Report reason.")
+    detail: Optional[str] = Field(default=None, description="Additional reporter-provided detail.")
+    status: Optional[str] = Field(default=None, description="Moderation workflow status.")
+    reporter_username: Optional[str] = Field(
+        default=None,
+        alias="reporterUsername",
+        description="Username of the reporter.",
+    )
+    reporter_id: Optional[int] = Field(
+        default=None,
+        alias="reporterId",
+        description="Identifier of the reporter.",
+    )
+    handler_username: Optional[str] = Field(
+        default=None,
+        alias="handlerUsername",
+        description="Username of the moderator handling the report.",
+    )
+    resolution: Optional[str] = Field(default=None, description="Moderator resolution note.")
+    target_title: Optional[str] = Field(
+        default=None,
+        alias="targetTitle",
+        description="Title of the reported content when available.",
+    )
+    target_excerpt: Optional[str] = Field(
+        default=None,
+        alias="targetExcerpt",
+        description="Excerpt of the reported content when available.",
+    )
+    post_id: Optional[int] = Field(
+        default=None,
+        alias="postId",
+        description="Related post identifier when available.",
+    )
+    comment_id: Optional[int] = Field(
+        default=None,
+        alias="commentId",
+        description="Related comment identifier when available.",
+    )
+    message_id: Optional[int] = Field(
+        default=None,
+        alias="messageId",
+        description="Related message identifier when available.",
+    )
+    created_at: Optional[datetime] = Field(
+        default=None,
+        alias="createdAt",
+        description="When the report was created.",
+    )
+    updated_at: Optional[datetime] = Field(
+        default=None,
+        alias="updatedAt",
+        description="When the report was last updated.",
+    )
+    handled_at: Optional[datetime] = Field(
+        default=None,
+        alias="handledAt",
+        description="When the report was resolved or dismissed.",
+    )
+
+    model_config = ConfigDict(populate_by_name=True, extra="allow")

@@ -40,10 +40,14 @@ public class UserMapper {
     dto.setDisplayMedal(user.getDisplayMedal());
     dto.setBot(user.isBot());
     dto.setCampusVerified(user.isCampusVerified());
-    dto.setCampusPersonType(
-      user.getCampusPersonType() != null ? user.getCampusPersonType().name() : null
-    );
-    dto.setDepartment(user.getDepartment());
+    if (user.isShowCampusIdentity()) {
+      dto.setCampusPersonType(
+        user.getCampusPersonType() != null ? user.getCampusPersonType().name() : null
+      );
+    }
+    if (user.isShowDepartment()) {
+      dto.setDepartment(user.getDepartment());
+    }
     return dto;
   }
 
@@ -81,16 +85,27 @@ public class UserMapper {
     dto.setNextLevelExp(levelService.nextLevelExp(user.getExperience()));
     dto.setBot(user.isBot());
     dto.setCampusVerified(user.isCampusVerified());
-    dto.setCampusPersonType(
-      user.getCampusPersonType() != null ? user.getCampusPersonType().name() : null
-    );
-    dto.setDepartment(user.getDepartment());
+    dto.setShowCampusIdentity(user.isShowCampusIdentity());
+    dto.setShowDepartment(user.isShowDepartment());
+    boolean canViewPrivateProfile = canViewPrivateProfile(user, viewer);
+    if (canViewPrivateProfile || user.isShowCampusIdentity()) {
+      dto.setCampusPersonType(
+        user.getCampusPersonType() != null ? user.getCampusPersonType().name() : null
+      );
+    }
+    if (canViewPrivateProfile || user.isShowDepartment()) {
+      dto.setDepartment(user.getDepartment());
+    }
     if (viewer != null) {
       dto.setSubscribed(subscriptionService.isSubscribed(viewer.getName(), user.getUsername()));
     } else {
       dto.setSubscribed(false);
     }
     return dto;
+  }
+
+  private boolean canViewPrivateProfile(User user, Authentication viewer) {
+    return viewer != null && viewer.getName() != null && viewer.getName().equals(user.getUsername());
   }
 
   public UserDto toDto(User user) {

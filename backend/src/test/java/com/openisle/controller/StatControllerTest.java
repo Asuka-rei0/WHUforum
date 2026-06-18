@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.openisle.config.CustomAccessDeniedHandler;
 import com.openisle.config.SecurityConfig;
+import com.openisle.dto.AdminDashboardStatsDto;
 import com.openisle.model.Role;
 import com.openisle.model.User;
 import com.openisle.repository.UserRepository;
@@ -149,5 +150,30 @@ class StatControllerTest {
       .andExpect(status().isOk())
       .andExpect(jsonPath("$[0].value").value(9))
       .andExpect(jsonPath("$[1].value").value(10));
+  }
+
+  @Test
+  void adminDashboardReturnsModerationSummary() throws Exception {
+    Mockito.when(jwtService.validateAndGetSubject("token")).thenReturn("user");
+    User user = new User();
+    user.setUsername("user");
+    user.setPassword("p");
+    user.setEmail("u@example.com");
+    user.setRole(Role.ADMIN);
+    Mockito.when(userRepository.findByUsername("user")).thenReturn(Optional.of(user));
+    AdminDashboardStatsDto dto = new AdminDashboardStatsDto();
+    dto.setUsers(10);
+    dto.setPosts(20);
+    dto.setComments(30);
+    dto.setOpenReports(2);
+    dto.setReviewingReports(1);
+    Mockito.when(statService.adminDashboardStats()).thenReturn(dto);
+
+    mockMvc
+      .perform(get("/api/stats/admin-dashboard").header("Authorization", "Bearer token"))
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.users").value(10))
+      .andExpect(jsonPath("$.openReports").value(2))
+      .andExpect(jsonPath("$.reviewingReports").value(1));
   }
 }

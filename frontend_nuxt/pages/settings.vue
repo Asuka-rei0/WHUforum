@@ -46,6 +46,41 @@
           <div class="setting-title">毛玻璃效果</div>
           <BaseSwitch v-model="frosted" />
         </div>
+        <div class="form-row switch-row">
+          <div>
+            <div class="setting-title">校园身份展示</div>
+            <div class="setting-description">在公开资料中展示身份类型</div>
+          </div>
+          <BaseSwitch v-model="showCampusIdentity" />
+        </div>
+        <div class="form-row switch-row">
+          <div>
+            <div class="setting-title">院系展示</div>
+            <div class="setting-description">允许其他用户看到你的院系信息</div>
+          </div>
+          <BaseSwitch v-model="showDepartment" />
+        </div>
+        <div class="form-row switch-row">
+          <div>
+            <div class="setting-title">站内通知</div>
+            <div class="setting-description">保存新的站内通知</div>
+          </div>
+          <BaseSwitch v-model="siteNotifications" />
+        </div>
+        <div class="form-row switch-row">
+          <div>
+            <div class="setting-title">邮件通知</div>
+            <div class="setting-description">接收重要互动邮件</div>
+          </div>
+          <BaseSwitch v-model="emailNotifications" />
+        </div>
+        <div class="form-row switch-row">
+          <div>
+            <div class="setting-title">浏览器推送</div>
+            <div class="setting-description">允许 Web Push 推送</div>
+          </div>
+          <BaseSwitch v-model="pushNotifications" />
+        </div>
       </div>
       <div v-if="role === 'ADMIN'" class="admin-section">
         <h3>管理员设置</h3>
@@ -135,6 +170,12 @@ const isLoadingPage = ref(false)
 const isSaving = ref(false)
 const isDeletingAccount = ref(false)
 const frosted = ref(true)
+const showCampusIdentity = ref(true)
+const showDepartment = ref(true)
+const siteNotifications = ref(true)
+const emailNotifications = ref(true)
+const pushNotifications = ref(true)
+const digestFrequency = ref('NONE')
 
 onMounted(async () => {
   isLoadingPage.value = true
@@ -146,6 +187,9 @@ onMounted(async () => {
     avatar.value = user.avatar
     userId.value = user.id
     role.value = user.role
+    showCampusIdentity.value = user.showCampusIdentity !== false
+    showDepartment.value = user.showDepartment !== false
+    await loadDeliveryPrefs()
     if (role.value === 'ADMIN') {
       loadAdminConfig()
     }
@@ -217,6 +261,22 @@ const loadAdminConfig = async () => {
     // ignore
   }
 }
+const loadDeliveryPrefs = async () => {
+  try {
+    const token = getToken()
+    const res = await fetch(`${API_BASE_URL}/api/notifications/delivery-prefs`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    if (!res.ok) return
+    const data = await res.json()
+    siteNotifications.value = data.siteEnabled !== false
+    emailNotifications.value = data.emailEnabled !== false
+    pushNotifications.value = data.pushEnabled !== false
+    digestFrequency.value = data.digestFrequency || 'NONE'
+  } catch (e) {
+    // ignore
+  }
+}
 const save = async () => {
   isSaving.value = true
 
@@ -249,7 +309,12 @@ const save = async () => {
     const res = await fetch(`${API_BASE_URL}/api/users/me`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-      body: JSON.stringify({ username: username.value, introduction: introduction.value }),
+      body: JSON.stringify({
+        username: username.value,
+        introduction: introduction.value,
+        showCampusIdentity: showCampusIdentity.value,
+        showDepartment: showDepartment.value,
+      }),
     })
 
     const data = await res.json()
@@ -273,6 +338,16 @@ const save = async () => {
         }),
       })
     }
+    await fetch(`${API_BASE_URL}/api/notifications/delivery-prefs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({
+        siteEnabled: siteNotifications.value,
+        emailEnabled: emailNotifications.value,
+        pushEnabled: pushNotifications.value,
+        digestFrequency: digestFrequency.value,
+      }),
+    })
     toast.success('保存成功')
   } while (!isSaving.value)
 
@@ -400,7 +475,8 @@ const deleteAccount = async () => {
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  max-width: 200px;
+  max-width: 500px;
+  gap: 18px;
 }
 
 .profile-section {

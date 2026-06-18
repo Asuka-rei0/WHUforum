@@ -16,6 +16,7 @@ from .schemas import (
     CommentCreateResult,
     CommentData,
     CommentReplyResult,
+    ContentReportData,
     NotificationData,
     NotificationCleanupResult,
     UnreadNotificationsResponse,
@@ -101,7 +102,7 @@ app = FastMCP(
         "Use this server to search OpenIsle content with the Authorization header or configured "
         "access token, create new posts, reply to posts and comments, retrieve details "
         "for a specific post, list posts created within a recent time window, and review "
-        "unread notification messages."
+        "unread notification messages or report content for moderation."
     ),
     host=settings.host,
     port=settings.port,
@@ -1051,6 +1052,138 @@ async def mark_notifications_read(
         processed_ids=processed_ids,
         total_marked=len(processed_ids),
     )
+
+
+@app.tool(
+    name="report_content",
+    description=(
+        "Report a post, comment, private message, or treehole for moderation using the request "
+        "Authorization header or configured access token."
+    ),
+    structured_output=True,
+)
+async def report_content(
+    target_type: Annotated[
+        str,
+        PydanticField(description="Reported target type: POST, COMMENT, MESSAGE, or TREEHOLE."),
+    ],
+    target_id: Annotated[
+        int,
+        PydanticField(ge=1, description="Identifier of the reported content."),
+    ],
+    reason: Annotated[
+        str,
+        PydanticField(
+            default="OTHER",
+            description=(
+                "Report reason: SPAM, HARASSMENT, HATE, SEXUAL, VIOLENCE, SELF_HARM, "
+                "PRIVACY, ILLEGAL, or OTHER."
+            ),
+        ),
+    ] = "OTHER",
+    detail: Annotated[
+        str | None,
+        PydanticField(default=None, description="Optional detail for the moderation team."),
+    ] = None,
+    ctx: Context | None = None,
+) -> ContentReportData:
+    """Submit a content report and return the moderation report payload."""
+
+    sanitized_target_type = target_type.strip().upper()
+    allowed_target_types = {"POST", "COMMENT", "MESSAGE", "TREEHOLE"}
+    if sanitized_target_type not in allowed_target_types:
+        raise ValueError(
+            "Report target type must be one of: POST, COMMENT, MESSAGE, TREEHOLE."
+        )
+
+    if isinstance(target_id, bool):
+        raise ValueError("Report target identifier must be an integer, not a boolean.")
+    sanitized_target_id = int(target_id)
+    if sanitized_target_id <= 0:
+        raise ValueError("Report target identifier must be a positive integer.")
+
+    sanitized_reason = reason.strip().upper()
+    allowed_reasons = {
+        "SPAM",
+        "HARASSMENT",
+        "HATE",
+        "SEXUAL",
+        "VIOLENCE",
+        "SELF_HARM",
+        "PRIVACY",
+        "ILLEGAL",
+        "OTHER",
+    }
+    if sanitized_reason not in allowed_reasons:
+        raise ValueError(
+            "Report reason must be one of: SPAM, HARASSMENT, HATE, SEXUAL, VIOLENCE, "
+            "SELF_HARM, PRIVACY, ILLEGAL, OTHER."
+        )
+
+    sanitized_detail = detail.strip() if isinstance(detail, str) else None
+    if sanitized_detail == "":
+        sanitized_detail = None
+
+    try:
+        logger.info(
+            "Reporting content target_type=%s target_id=%s",
+            sanitized_target_type,
+            sanitized_target_id,
+        )
+        raw_report = await search_client.report_content(
+            target_type=sanitized_target_type,
+            target_id=sanitized_target_id,
+            reason=sanitized_reason,
+            detail=sanitized_detail,
+            token=_extract_authorization_token(ctx),
+        )
+    except httpx.HTTPStatusError as exc:  # pragma: no cover - network errors
+        status_code = exc.response.status_code
+        if status_code == 400:
+            message = "Report creation failed due to invalid target, reason, or duplicate report."
+        elif status_code == 401:
+            message = (
+                "Authentication failed while reporting content. Please verify the "
+                "Authorization header or configured token."
+            )
+        elif status_code == 403:
+            message = "The provided Authorization token is not authorized to report content."
+        elif status_code == 404:
+            message = "The reported content target was not found."
+        else:
+            message = (
+                "OpenIsle backend returned HTTP "
+                f"{status_code} while reporting content."
+            )
+        if ctx is not None:
+            await ctx.error(message)
+        raise ValueError(message) from exc
+    except httpx.RequestError as exc:  # pragma: no cover - network errors
+        message = f"Unable to reach OpenIsle backend report service: {exc}."
+        if ctx is not None:
+            await ctx.error(message)
+        raise ValueError(message) from exc
+
+    try:
+        report = ContentReportData.model_validate(raw_report)
+    except ValidationError as exc:
+        message = "Received malformed data from the content report endpoint."
+        if ctx is not None:
+            await ctx.error(message)
+        raise ValueError(message) from exc
+
+    if ctx is not None:
+        await ctx.info(
+            f"Report {report.id} created for {sanitized_target_type}/{sanitized_target_id}."
+        )
+    logger.debug(
+        "Validated content report payload id=%s target_type=%s target_id=%s",
+        report.id,
+        report.target_type,
+        report.target_id,
+    )
+
+    return report
 
 
 def main() -> None:

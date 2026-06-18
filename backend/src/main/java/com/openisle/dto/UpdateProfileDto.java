@@ -8,4 +8,6 @@ public class UpdateProfileDto {
 
   private String username;
   private String introduction;
+  private Boolean showCampusIdentity;
+  private Boolean showDepartment;
 }

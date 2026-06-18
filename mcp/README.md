@@ -35,6 +35,9 @@ By default the server listens on port `8085` and serves MCP over Streamable HTTP
 | `reply_to_post` | Create a new comment on a post using a JWT token. |
 | `reply_to_comment` | Reply to an existing comment using a JWT token. |
 | `recent_posts` | Retrieve posts created within the last *N* minutes. |
+| `list_unread_messages` | List unread notification messages for the authenticated user. |
+| `mark_notifications_read` | Mark notification messages as read. |
+| `report_content` | Report a post, comment, private message, or treehole for moderation. |
 
 The tools return structured data mirroring the backend DTOs, including highlighted snippets for
 search results, the full comment payload for post replies and comment replies, detailed metadata
@@ -49,4 +52,8 @@ for recent posts, and WHUforum V1 fields such as anonymous aliases and flea mark
 - `flea_contact`
 
 `reply_to_post` and `reply_to_comment` accept optional `anonymous`.
+
+`report_content` requires `target_type` (`POST`, `COMMENT`, `MESSAGE`, or `TREEHOLE`),
+`target_id`, and an optional `reason` / `detail` pair. It uses the same Authorization header
+or configured access token behavior as the other authenticated tools.
 

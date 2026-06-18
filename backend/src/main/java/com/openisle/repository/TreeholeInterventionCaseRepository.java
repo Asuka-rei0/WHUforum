@@ -16,6 +16,8 @@ public interface TreeholeInterventionCaseRepository
 
   boolean existsByPost_Id(Long postId);
 
+  long countByStatus(TreeholeInterventionStatus status);
+
   void deleteByPost_Id(Long postId);
 
   @Query(

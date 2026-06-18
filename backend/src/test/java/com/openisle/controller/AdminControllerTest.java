@@ -15,6 +15,7 @@ import com.openisle.service.AnonymousAuditService;
 import com.openisle.service.EmailSender;
 import com.openisle.service.JwtService;
 import com.openisle.service.SensitiveWordService;
+import com.openisle.service.TreeholeInterventionService;
 import com.openisle.service.UserVisitService;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,9 @@ class AdminControllerTest {
 
   @MockBean
   private EmailSender emailSender;
+
+  @MockBean
+  private TreeholeInterventionService treeholeInterventionService;
 
   @Test
   void adminHelloReturnsMessage() throws Exception {

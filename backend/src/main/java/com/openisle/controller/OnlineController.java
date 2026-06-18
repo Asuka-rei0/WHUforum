@@ -8,7 +8,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
-import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.security.core.Authentication;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -27,8 +29,11 @@ public class OnlineController {
   @PostMapping("/heartbeat")
   @Operation(summary = "Heartbeat", description = "Record user heartbeat")
   @ApiResponse(responseCode = "200", description = "Heartbeat recorded")
-  public void ping(@RequestParam String userId) {
-    redisTemplate.opsForValue().set(ONLINE_KEY + userId, "1", Duration.ofSeconds(150));
+  public void ping(Authentication auth) {
+    if (auth == null || auth.getName() == null) {
+      throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Missing token");
+    }
+    redisTemplate.opsForValue().set(ONLINE_KEY + auth.getName(), "1", Duration.ofSeconds(150));
   }
 
   @GetMapping("/count")

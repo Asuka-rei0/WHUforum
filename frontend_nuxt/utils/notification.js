@@ -23,6 +23,7 @@ const iconMap = {
   REGISTER_REQUEST: 'AlarmClock',
   ACTIVITY_REDEEM: 'PaperMoneyTwo',
   POINT_REDEEM: 'Gift',
+  CONTENT_REPORT: 'Report',
   LOTTERY_WIN: 'MedalOne',
   LOTTERY_DRAW: 'Fireworks',
   POLL_VOTE: 'ChartHistogram',
@@ -428,6 +429,15 @@ function createFetchNotifications() {
             ...n,
             icon: iconMap[n.type],
             iconClick: () => {},
+          })
+        } else if (n.type === 'CONTENT_REPORT') {
+          arr.push({
+            ...n,
+            icon: iconMap[n.type],
+            iconClick: () => {
+              markNotificationRead(n.id)
+              navigateTo('/admin/reports', { replace: true })
+            },
           })
         } else {
           arr.push({

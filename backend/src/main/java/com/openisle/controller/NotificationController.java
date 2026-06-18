@@ -1,6 +1,8 @@
 package com.openisle.controller;
 
 import com.openisle.dto.NotificationDto;
+import com.openisle.dto.NotificationDeliveryPreferenceDto;
+import com.openisle.dto.NotificationDeliveryPreferenceUpdateRequest;
 import com.openisle.dto.NotificationMarkReadRequest;
 import com.openisle.dto.NotificationPreferenceDto;
 import com.openisle.dto.NotificationPreferenceUpdateRequest;
@@ -163,5 +165,38 @@ public class NotificationController {
     Authentication auth
   ) {
     notificationService.updateEmailPreference(auth.getName(), req.getType(), req.isEnabled());
+  }
+
+  @GetMapping("/delivery-prefs")
+  @Operation(
+    summary = "List delivery preferences",
+    description = "Get site, email, push and digest notification preferences"
+  )
+  @ApiResponse(
+    responseCode = "200",
+    description = "Delivery preferences",
+    content = @Content(schema = @Schema(implementation = NotificationDeliveryPreferenceDto.class))
+  )
+  @SecurityRequirement(name = "JWT")
+  public NotificationDeliveryPreferenceDto deliveryPrefs(Authentication auth) {
+    return notificationService.getDeliveryPreferences(auth.getName());
+  }
+
+  @PostMapping("/delivery-prefs")
+  @Operation(
+    summary = "Update delivery preferences",
+    description = "Update site, email, push and digest notification preferences"
+  )
+  @ApiResponse(
+    responseCode = "200",
+    description = "Updated delivery preferences",
+    content = @Content(schema = @Schema(implementation = NotificationDeliveryPreferenceDto.class))
+  )
+  @SecurityRequirement(name = "JWT")
+  public NotificationDeliveryPreferenceDto updateDeliveryPrefs(
+    @RequestBody NotificationDeliveryPreferenceUpdateRequest request,
+    Authentication auth
+  ) {
+    return notificationService.updateDeliveryPreferences(auth.getName(), request);
   }
 }

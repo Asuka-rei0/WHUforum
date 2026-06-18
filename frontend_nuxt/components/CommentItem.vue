@@ -130,8 +130,10 @@ import CommentEditor from '~/components/CommentEditor.vue'
 import DropdownMenu from '~/components/DropdownMenu.vue'
 import ReactionsGroup from '~/components/ReactionsGroup.vue'
 import BaseUserAvatar from '~/components/BaseUserAvatar.vue'
+import { useContentReport } from '~/composables/useContentReport'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
+const { submitReport } = useContentReport()
 
 const props = defineProps({
   comment: {
@@ -241,8 +243,14 @@ const commentMenuItems = computed(() => {
       items.push({ text: '置顶', onClick: () => pinComment() })
     }
   }
+  if (loggedIn.value) {
+    items.push({ text: '举报评论', color: 'red', onClick: () => reportComment() })
+  }
   return items
 })
+const reportComment = async () => {
+  await submitReport({ targetType: 'COMMENT', targetId: props.comment.id, reason: 'OTHER' })
+}
 const deleteComment = async () => {
   const token = getToken()
   if (!token) {

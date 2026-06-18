@@ -376,6 +376,55 @@ class NotificationServiceTest {
   }
 
   @Test
+  void createNotificationKeepsDeliveryChannelsIndependent() {
+    NotificationRepository nRepo = mock(NotificationRepository.class);
+    UserRepository uRepo = mock(UserRepository.class);
+    ReactionRepository rRepo = mock(ReactionRepository.class);
+    EmailSender email = mock(EmailSender.class);
+    PushNotificationService push = mock(PushNotificationService.class);
+    Executor executor = Runnable::run;
+    NotificationService service = new NotificationService(
+      nRepo,
+      uRepo,
+      email,
+      push,
+      rRepo,
+      executor
+    );
+    org.springframework.test.util.ReflectionTestUtils.setField(
+      service,
+      "websiteUrl",
+      "https://ex.com"
+    );
+
+    User user = new User();
+    user.setEmail("a@a.com");
+    user.setNotificationSiteEnabled(false);
+    user.setNotificationEmailEnabled(true);
+    user.setNotificationPushEnabled(true);
+    Post post = new Post();
+    post.setId(1L);
+    Comment comment = new Comment();
+    comment.setId(2L);
+
+    Notification created = service.createNotification(
+      user,
+      NotificationType.COMMENT_REPLY,
+      post,
+      comment,
+      null,
+      null,
+      null,
+      null
+    );
+
+    assertNull(created);
+    verify(nRepo, never()).save(any(Notification.class));
+    verify(email).sendEmail("a@a.com", "有人回复了你", "https://ex.com/posts/1#comment-2");
+    verify(push).sendNotification(eq(user), contains("/posts/1#comment-2"));
+  }
+
+  @Test
   void postViewedNotificationDeletesOldOnes() {
     NotificationRepository nRepo = mock(NotificationRepository.class);
     UserRepository uRepo = mock(UserRepository.class);

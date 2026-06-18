@@ -560,7 +560,13 @@ public class UserService {
     return saved;
   }
 
-  public User updateProfile(String currentUsername, String newUsername, String introduction) {
+  public User updateProfile(
+    String currentUsername,
+    String newUsername,
+    String introduction,
+    Boolean showCampusIdentity,
+    Boolean showDepartment
+  ) {
     User user = userRepository
       .findByUsername(currentUsername)
       .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
@@ -576,7 +582,17 @@ public class UserService {
     if (introduction != null) {
       user.setIntroduction(introduction);
     }
+    if (showCampusIdentity != null) {
+      user.setShowCampusIdentity(showCampusIdentity);
+    }
+    if (showDepartment != null) {
+      user.setShowDepartment(showDepartment);
+    }
     return userRepository.save(user);
+  }
+
+  public User updateProfile(String currentUsername, String newUsername, String introduction) {
+    return updateProfile(currentUsername, newUsername, introduction, null, null);
   }
 
   public User updatePassword(String username, String newPassword) {
@@ -613,6 +629,12 @@ public class UserService {
     user.setCampusPersonType(CampusPersonType.UNKNOWN);
     user.setDepartment(null);
     user.setCampusVerified(false);
+    user.setShowCampusIdentity(true);
+    user.setShowDepartment(true);
+    user.setNotificationSiteEnabled(true);
+    user.setNotificationEmailEnabled(true);
+    user.setNotificationPushEnabled(true);
+    user.setNotificationDigestFrequency("NONE");
     user.setDisplayMedal(null);
     user.getDisabledNotificationTypes().clear();
     user.getDisabledEmailNotificationTypes().clear();

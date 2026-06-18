@@ -342,6 +342,8 @@ public interface PostRepository extends JpaRepository<Post, Long> {
 
   long countByAuthor_Id(Long userId);
 
+  long countByStatus(PostStatus status);
+
   @Query(
     "SELECT FUNCTION('date', p.createdAt) AS d, COUNT(p) AS c FROM Post p " +
       "WHERE p.createdAt >= :start AND p.createdAt < :end GROUP BY d ORDER BY d"

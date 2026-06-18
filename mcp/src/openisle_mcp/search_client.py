@@ -337,6 +337,48 @@ class SearchClient:
             len(sanitized_ids),
         )
 
+    async def report_content(
+        self,
+        *,
+        target_type: str,
+        target_id: int,
+        reason: str,
+        detail: str | None = None,
+        token: str,
+    ) -> dict[str, Any]:
+        """Create a content moderation report and return the backend payload."""
+
+        client = self._get_client()
+        resolved_token = self._require_token(token)
+        payload: dict[str, Any] = {
+            "targetType": target_type,
+            "targetId": target_id,
+            "reason": reason,
+        }
+        if detail is not None:
+            payload["detail"] = detail
+
+        logger.debug(
+            "Reporting content target_type=%s target_id=%s reason=%s",
+            target_type,
+            target_id,
+            reason,
+        )
+        response = await client.post(
+            "/api/reports",
+            json=payload,
+            headers=self._build_headers(token=resolved_token, include_json=True),
+        )
+        response.raise_for_status()
+        body = self._ensure_dict(response.json())
+        logger.info(
+            "Content report created with id=%s for %s/%s",
+            body.get("id"),
+            target_type,
+            target_id,
+        )
+        return body
+
     async def aclose(self) -> None:
         """Dispose of the underlying HTTP client."""
 

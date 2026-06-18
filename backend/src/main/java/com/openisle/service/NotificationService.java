@@ -1,6 +1,8 @@
 package com.openisle.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openisle.dto.NotificationDeliveryPreferenceDto;
+import com.openisle.dto.NotificationDeliveryPreferenceUpdateRequest;
 import com.openisle.dto.NotificationPreferenceDto;
 import com.openisle.exception.EmailSendException;
 import com.openisle.model.*;
@@ -60,6 +62,9 @@ public class NotificationService {
   }
 
   public void sendCustomPush(User user, String body, String url) {
+    if (user == null || !user.isNotificationPushEnabled()) {
+      return;
+    }
     pushNotificationService.sendNotification(user, buildPayload(body, url));
   }
 
@@ -83,19 +88,25 @@ public class NotificationService {
     ReactionType reactionType,
     String content
   ) {
-    Notification n = new Notification();
-    n.setUser(user);
-    n.setType(type);
-    n.setPost(post);
-    n.setComment(comment);
-    n.setApproved(approved);
-    n.setFromUser(fromUser);
-    n.setReactionType(reactionType);
-    n.setContent(content);
-    if (type == NotificationType.POST_VIEWED && fromUser != null && post != null) {
-      notificationRepository.deleteByTypeAndFromUserAndPost(type, fromUser, post);
+    if (user == null) {
+      return null;
     }
-    n = notificationRepository.save(n);
+    Notification n = null;
+    if (user.isNotificationSiteEnabled()) {
+      n = new Notification();
+      n.setUser(user);
+      n.setType(type);
+      n.setPost(post);
+      n.setComment(comment);
+      n.setApproved(approved);
+      n.setFromUser(fromUser);
+      n.setReactionType(reactionType);
+      n.setContent(content);
+      if (type == NotificationType.POST_VIEWED && fromUser != null && post != null) {
+        notificationRepository.deleteByTypeAndFromUserAndPost(type, fromUser, post);
+      }
+      n = notificationRepository.save(n);
+    }
 
     //        Runnable asyncTask = () -> {
     if (
@@ -103,6 +114,7 @@ public class NotificationService {
       user.getEmail() != null &&
       post != null &&
       comment != null &&
+      user.isNotificationEmailEnabled() &&
       !user.getDisabledEmailNotificationTypes().contains(NotificationType.COMMENT_REPLY)
     ) {
       String url = String.format(
@@ -341,6 +353,51 @@ public class NotificationService {
       }
     }
     notificationRepository.saveAll(notifs);
+  }
+
+  public NotificationDeliveryPreferenceDto getDeliveryPreferences(String username) {
+    User user = userRepository
+      .findByUsername(username)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+    NotificationDeliveryPreferenceDto dto = new NotificationDeliveryPreferenceDto();
+    dto.setSiteEnabled(user.isNotificationSiteEnabled());
+    dto.setEmailEnabled(user.isNotificationEmailEnabled());
+    dto.setPushEnabled(user.isNotificationPushEnabled());
+    dto.setDigestFrequency(user.getNotificationDigestFrequency());
+    return dto;
+  }
+
+  public NotificationDeliveryPreferenceDto updateDeliveryPreferences(
+    String username,
+    NotificationDeliveryPreferenceUpdateRequest request
+  ) {
+    User user = userRepository
+      .findByUsername(username)
+      .orElseThrow(() -> new com.openisle.exception.NotFoundException("User not found"));
+    if (request != null) {
+      if (request.getSiteEnabled() != null) {
+        user.setNotificationSiteEnabled(request.getSiteEnabled());
+      }
+      if (request.getEmailEnabled() != null) {
+        user.setNotificationEmailEnabled(request.getEmailEnabled());
+      }
+      if (request.getPushEnabled() != null) {
+        user.setNotificationPushEnabled(request.getPushEnabled());
+      }
+      if (request.getDigestFrequency() != null) {
+        user.setNotificationDigestFrequency(normalizeDigestFrequency(request.getDigestFrequency()));
+      }
+    }
+    userRepository.save(user);
+    return getDeliveryPreferences(username);
+  }
+
+  private String normalizeDigestFrequency(String value) {
+    String normalized = value.trim().toUpperCase(java.util.Locale.ROOT);
+    if (!java.util.Set.of("NONE", "DAILY", "WEEKLY").contains(normalized)) {
+      throw new IllegalArgumentException("Unsupported digest frequency");
+    }
+    return normalized;
   }
 
   @Transactional

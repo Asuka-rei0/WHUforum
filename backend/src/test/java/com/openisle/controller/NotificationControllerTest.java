@@ -4,6 +4,8 @@ import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.openisle.dto.NotificationDeliveryPreferenceDto;
+import com.openisle.dto.NotificationDeliveryPreferenceUpdateRequest;
 import com.openisle.dto.NotificationDto;
 import com.openisle.dto.PostSummaryDto;
 import com.openisle.mapper.NotificationMapper;
@@ -109,5 +111,56 @@ class NotificationControllerTest {
       )
       .andExpect(status().isOk())
       .andExpect(jsonPath("$.count").value(3));
+  }
+
+  @Test
+  void deliveryPreferencesEndpoint() throws Exception {
+    NotificationDeliveryPreferenceDto dto = new NotificationDeliveryPreferenceDto();
+    dto.setSiteEnabled(true);
+    dto.setEmailEnabled(false);
+    dto.setPushEnabled(true);
+    dto.setDigestFrequency("WEEKLY");
+    when(notificationService.getDeliveryPreferences("alice")).thenReturn(dto);
+
+    mockMvc
+      .perform(
+        get("/api/notifications/delivery-prefs").principal(
+          new UsernamePasswordAuthenticationToken("alice", "p")
+        )
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.siteEnabled").value(true))
+      .andExpect(jsonPath("$.emailEnabled").value(false))
+      .andExpect(jsonPath("$.digestFrequency").value("WEEKLY"));
+  }
+
+  @Test
+  void updateDeliveryPreferencesEndpoint() throws Exception {
+    NotificationDeliveryPreferenceDto dto = new NotificationDeliveryPreferenceDto();
+    dto.setSiteEnabled(false);
+    dto.setEmailEnabled(true);
+    dto.setPushEnabled(false);
+    dto.setDigestFrequency("DAILY");
+    when(
+      notificationService.updateDeliveryPreferences(
+        eq("alice"),
+        any(NotificationDeliveryPreferenceUpdateRequest.class)
+      )
+    )
+      .thenReturn(dto);
+
+    mockMvc
+      .perform(
+        post("/api/notifications/delivery-prefs")
+          .contentType(MediaType.APPLICATION_JSON)
+          .content(
+            "{\"siteEnabled\":false,\"emailEnabled\":true,\"pushEnabled\":false,\"digestFrequency\":\"DAILY\"}"
+          )
+          .principal(new UsernamePasswordAuthenticationToken("alice", "p"))
+      )
+      .andExpect(status().isOk())
+      .andExpect(jsonPath("$.siteEnabled").value(false))
+      .andExpect(jsonPath("$.pushEnabled").value(false))
+      .andExpect(jsonPath("$.digestFrequency").value("DAILY"));
   }
 }

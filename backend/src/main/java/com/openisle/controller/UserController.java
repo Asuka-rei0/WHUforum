@@ -111,7 +111,13 @@ public class UserController {
     content = @Content(schema = @Schema(implementation = Map.class))
   )
   public ResponseEntity<?> updateProfile(@RequestBody UpdateProfileDto dto, Authentication auth) {
-    User user = userService.updateProfile(auth.getName(), dto.getUsername(), dto.getIntroduction());
+    User user = userService.updateProfile(
+      auth.getName(),
+      dto.getUsername(),
+      dto.getIntroduction(),
+      dto.getShowCampusIdentity(),
+      dto.getShowDepartment()
+    );
     return ResponseEntity.ok(
       Map.of(
         "token",

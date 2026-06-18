@@ -661,6 +661,19 @@
                       <span v-if="item.content">，{{ item.content }}</span>
                     </NotificationContainer>
                   </template>
+                  <template v-else-if="item.type === 'CONTENT_REPORT'">
+                    <NotificationContainer :item="item" :markRead="markRead">
+                      收到新的内容举报：
+                      <button
+                        class="notif-link-button"
+                        type="button"
+                        @click="openReportQueue(item)"
+                      >
+                        前往举报队列
+                      </button>
+                      <span v-if="item.content">，{{ item.content }}</span>
+                    </NotificationContainer>
+                  </template>
                   <template v-else>
                     <NotificationContainer :item="item" :markRead="markRead">
                       {{ formatType(item.type) }}
@@ -704,6 +717,7 @@ import {
 } from '~/utils/notification'
 import TimeManager from '~/utils/time'
 import BaseSwitch from '~/components/BaseSwitch.vue'
+import { navigateTo } from 'nuxt/app'
 
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
@@ -885,6 +899,8 @@ const formatType = (t) => {
       return '跳蚤市场状态更新'
     case 'MODERATION_ALERT':
       return '内容审核提醒'
+    case 'CONTENT_REPORT':
+      return '内容举报'
     case 'POLL_VOTE':
       return '有人参与你的投票'
     case 'POLL_RESULT_OWNER':
@@ -908,10 +924,16 @@ const needAdminSet = new Set([
   'POINT_REDEEM',
   'ACTIVITY_REDEEM',
   'MODERATION_ALERT',
+  'CONTENT_REPORT',
 ])
 
 const canShowNotification = (type) => {
   return !needAdminSet.has(type) || isAdmin.value
+}
+
+const openReportQueue = (item) => {
+  markRead(item.id)
+  navigateTo('/admin/reports')
 }
 
 const loadCurrentTab = async () => {
@@ -1015,6 +1037,16 @@ onActivated(loadCurrentTab)
   color: var(--primary-color) !important;
   text-decoration: none !important;
   word-break: break-all;
+}
+
+.notif-link-button {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--primary-color);
+  cursor: pointer;
+  font: inherit;
+  font-weight: bold;
 }
 
 .optional-buttons {

@@ -142,23 +142,13 @@ const ensureCurrentUser = async () => {
 // 心跳检测
 async function sendPing() {
   try {
+    const token = getToken()
+    if (!token) return
     await ensureCurrentUser()
-    // 已登录就用 userId，否则随机生成游客ID
-    let userId = authState.userId
-    if (userId) {
-      // 用户已登录，清理游客 ID
-      localStorage.removeItem('guestId')
-    } else {
-      // 游客模式
-      let savedId = localStorage.getItem('guestId')
-      if (!savedId) {
-        savedId = `guest-${crypto.randomUUID()}`
-        localStorage.setItem('guestId', savedId)
-      }
-      userId = savedId
-    }
-    const res = await fetch(`${API_BASE_URL}/api/online/heartbeat?userId=${userId}`, {
+    localStorage.removeItem('guestId')
+    await fetch(`${API_BASE_URL}/api/online/heartbeat`, {
       method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
     })
   } catch (e) {
     console.error('心跳失败', e)

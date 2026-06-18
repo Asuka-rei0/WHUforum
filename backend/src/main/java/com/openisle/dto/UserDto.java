@@ -32,4 +32,6 @@ public class UserDto {
   private boolean campusVerified;
   private String campusPersonType;
   private String department;
+  private boolean showCampusIdentity;
+  private boolean showDepartment;
 }
