@@ -9,6 +9,7 @@ import com.openisle.model.*;
 import com.openisle.repository.CategoryProposalPostRepository;
 import com.openisle.repository.CategoryRepository;
 import com.openisle.repository.CommentRepository;
+import com.openisle.repository.ContentReportRepository;
 import com.openisle.repository.FleaMarketItemRepository;
 import com.openisle.repository.LotteryPostRepository;
 import com.openisle.repository.NotificationRepository;
@@ -80,6 +81,7 @@ public class PostService {
   private final FleaMarketItemRepository fleaMarketItemRepository;
   private final AnonymousAuditService anonymousAuditService;
   private final ModerationService moderationService;
+  private final ContentReportRepository contentReportRepository;
   private final ConcurrentMap<Long, ScheduledFuture<?>> scheduledFinalizations =
     new ConcurrentHashMap<>();
 
@@ -129,7 +131,8 @@ public class PostService {
     CategoryService categoryService,
     FleaMarketItemRepository fleaMarketItemRepository,
     AnonymousAuditService anonymousAuditService,
-    ModerationService moderationService
+    ModerationService moderationService,
+    ContentReportRepository contentReportRepository
   ) {
     this.postRepository = postRepository;
     this.userRepository = userRepository;
@@ -162,6 +165,7 @@ public class PostService {
     this.fleaMarketItemRepository = fleaMarketItemRepository;
     this.anonymousAuditService = anonymousAuditService;
     this.moderationService = moderationService;
+    this.contentReportRepository = contentReportRepository;
   }
 
   @EventListener(ApplicationReadyEvent.class)
@@ -1407,6 +1411,7 @@ public class PostService {
     if (!user.getId().equals(author.getId()) && user.getRole() != Role.ADMIN) {
       throw new IllegalArgumentException("Unauthorized");
     }
+    contentReportRepository.detachPostReferences(post.getId());
     anonymousAuditService.deleteByPost(post);
     fleaMarketItemRepository.findByPost(post).ifPresent(fleaMarketItemRepository::delete);
     commentService.deleteAllByPostHard(post);

@@ -243,6 +243,13 @@
       :imgs="lightboxImgs"
       @hide="lightboxVisible = false"
     />
+    <ContentReportDialog
+      v-model="reportDialogVisible"
+      :target-type="reportTarget.targetType"
+      :target-id="reportTarget.targetId"
+      :submitting="isSubmittingReport"
+      @submit="submitPostReport"
+    />
   </div>
 </template>
 
@@ -264,10 +271,12 @@ import DropdownMenu from '~/components/DropdownMenu.vue'
 import PostLottery from '~/components/PostLottery.vue'
 import PostPoll from '~/components/PostPoll.vue'
 import BaseUserAvatar from '~/components/BaseUserAvatar.vue'
+import ContentReportDialog from '~/components/ContentReportDialog.vue'
 import { renderMarkdown, handleMarkdownClick, stripMarkdownLength } from '~/utils/markdown'
 import { getMedalTitle } from '~/utils/medal'
 import { toast } from '~/main'
 import { getToken, authState } from '~/utils/auth'
+import { getApiErrorMessage } from '~/utils/apiError'
 import TimeManager from '~/utils/time'
 import { useIsMobile } from '~/utils/screen'
 import Dropdown from '~/components/Dropdown.vue'
@@ -320,6 +329,7 @@ const pinnedAt = ref(null)
 const rssExcluded = ref(false)
 const isWaitingPostingComment = ref(false)
 const isDeletingPost = ref(false)
+const isSubmittingReport = ref(false)
 const postTime = ref('')
 const postItems = ref([])
 const mainContainer = ref(null)
@@ -358,6 +368,8 @@ if (import.meta.client) {
 const lightboxVisible = ref(false)
 const lightboxIndex = ref(0)
 const lightboxImgs = ref([])
+const reportDialogVisible = ref(false)
+const reportTarget = ref({ targetType: 'POST', targetId: Number(postId) })
 const loggedIn = computed(() => authState.loggedIn)
 const isAdmin = computed(() => authState.role === 'ADMIN')
 const isAuthor = computed(() => {
@@ -411,7 +423,7 @@ const articleMenuItems = computed(() => {
     items.push({ text: '驳回', color: 'red', onClick: () => rejectPost() })
   }
   if (loggedIn.value) {
-    items.push({ text: '举报帖子', color: 'red', onClick: () => reportPost() })
+    items.push({ text: '举报帖子', color: 'red', onClick: () => openReportDialog() })
   }
   return items
 })
@@ -747,12 +759,23 @@ const copyPostLink = () => {
   })
 }
 
-const reportPost = async () => {
-  await submitReport({
+const openReportDialog = () => {
+  reportTarget.value = {
     targetType: author.value?.anonymous ? 'TREEHOLE' : 'POST',
     targetId: Number(postId),
-    reason: 'OTHER',
-  })
+  }
+  reportDialogVisible.value = true
+}
+
+const submitPostReport = async ({ targetType, targetId, reason, detail }) => {
+  if (isSubmittingReport.value) return
+  isSubmittingReport.value = true
+  try {
+    const ok = await submitReport({ targetType, targetId, reason, detail })
+    if (ok) reportDialogVisible.value = false
+  } finally {
+    isSubmittingReport.value = false
+  }
 }
 
 const subscribePost = async () => {
@@ -914,10 +937,11 @@ const deletePost = async () => {
       await navigateTo('/', { replace: true })
       window.dispatchEvent(new Event('refresh-home'))
     } else {
-      toast.error('操作失败')
+      const data = await res.json().catch(() => ({}))
+      toast.error(getApiErrorMessage(data, '删除失败，请稍后重试'))
     }
   } catch (e) {
-    toast.error('操作失败')
+    toast.error(getApiErrorMessage(e, '删除失败，请稍后重试'))
   } finally {
     isDeletingPost.value = false
   }

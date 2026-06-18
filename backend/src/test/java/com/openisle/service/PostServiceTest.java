@@ -80,6 +80,7 @@ class PostServiceTest {
     PointHistoryRepository pointHistoryRepository = mock(PointHistoryRepository.class);
     RedisTemplate redisTemplate = mock(RedisTemplate.class);
     SearchIndexEventPublisher searchIndexEventPublisher = mock(SearchIndexEventPublisher.class);
+    ContentReportRepository contentReportRepository = mock(ContentReportRepository.class);
 
     PostService service = new PostService(
       postRepo,
@@ -111,7 +112,8 @@ class PostServiceTest {
       mock(CategoryService.class),
       mock(FleaMarketItemRepository.class),
       mock(AnonymousAuditService.class),
-      mock(ModerationService.class)
+      mock(ModerationService.class),
+      contentReportRepository
     );
     when(context.getBean(PostService.class)).thenReturn(service);
 
@@ -132,11 +134,14 @@ class PostServiceTest {
 
     service.deletePost(1L, "alice");
 
+    var deletionOrder = inOrder(contentReportRepository, commentService, postRepo);
+    deletionOrder.verify(contentReportRepository).detachPostReferences(1L);
+    deletionOrder.verify(commentService).deleteAllByPostHard(post);
+    deletionOrder.verify(postRepo).delete(post);
+
     verify(postReadService).deleteByPost(post);
-    verify(commentService).deleteAllByPostHard(post);
     verify(pollVoteRepo).deleteByPost_Id(1L);
     verify(pointHistoryRepository).markDeletedAndDetachPost(eq(1L), any(LocalDateTime.class));
-    verify(postRepo).delete(post);
     verify(postChangeLogService).deleteLogsForPost(post);
   }
 
@@ -198,7 +203,8 @@ class PostServiceTest {
       mock(CategoryService.class),
       mock(FleaMarketItemRepository.class),
       mock(AnonymousAuditService.class),
-      mock(ModerationService.class)
+      mock(ModerationService.class),
+      mock(ContentReportRepository.class)
     );
     when(context.getBean(PostService.class)).thenReturn(service);
 
@@ -296,7 +302,8 @@ class PostServiceTest {
       mock(CategoryService.class),
       mock(FleaMarketItemRepository.class),
       mock(AnonymousAuditService.class),
-      mock(ModerationService.class)
+      mock(ModerationService.class),
+      mock(ContentReportRepository.class)
     );
     when(context.getBean(PostService.class)).thenReturn(service);
     when(redisTemplate.opsForValue()).thenReturn(valueOperations);
@@ -391,7 +398,8 @@ class PostServiceTest {
       mock(CategoryService.class),
       mock(FleaMarketItemRepository.class),
       mock(AnonymousAuditService.class),
-      mock(ModerationService.class)
+      mock(ModerationService.class),
+      mock(ContentReportRepository.class)
     );
     when(context.getBean(PostService.class)).thenReturn(service);
 
@@ -491,7 +499,8 @@ class PostServiceTest {
       mock(CategoryService.class),
       mock(FleaMarketItemRepository.class),
       mock(AnonymousAuditService.class),
-      mock(ModerationService.class)
+      mock(ModerationService.class),
+      mock(ContentReportRepository.class)
     );
     when(context.getBean(PostService.class)).thenReturn(service);
 

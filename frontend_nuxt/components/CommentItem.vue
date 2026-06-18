@@ -113,6 +113,13 @@
         :index="lightboxIndex"
         @hide="lightboxVisible = false"
       />
+      <ContentReportDialog
+        v-model="reportDialogVisible"
+        target-type="COMMENT"
+        :target-id="comment.id"
+        :submitting="isSubmittingReport"
+        @submit="submitCommentReport"
+      />
     </div>
   </div>
 </template>
@@ -130,6 +137,7 @@ import CommentEditor from '~/components/CommentEditor.vue'
 import DropdownMenu from '~/components/DropdownMenu.vue'
 import ReactionsGroup from '~/components/ReactionsGroup.vue'
 import BaseUserAvatar from '~/components/BaseUserAvatar.vue'
+import ContentReportDialog from '~/components/ContentReportDialog.vue'
 import { useContentReport } from '~/composables/useContentReport'
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
@@ -173,6 +181,8 @@ const isWaitingForReply = ref(false)
 const lightboxVisible = ref(false)
 const lightboxIndex = ref(0)
 const lightboxImgs = ref([])
+const reportDialogVisible = ref(false)
+const isSubmittingReport = ref(false)
 const loggedIn = computed(() => authState.loggedIn)
 const commentReactionsGroupRef = ref(null)
 const commentLikeCount = computed(
@@ -244,12 +254,24 @@ const commentMenuItems = computed(() => {
     }
   }
   if (loggedIn.value) {
-    items.push({ text: '举报评论', color: 'red', onClick: () => reportComment() })
+    items.push({ text: '举报评论', color: 'red', onClick: () => openReportDialog() })
   }
   return items
 })
-const reportComment = async () => {
-  await submitReport({ targetType: 'COMMENT', targetId: props.comment.id, reason: 'OTHER' })
+
+const openReportDialog = () => {
+  reportDialogVisible.value = true
+}
+
+const submitCommentReport = async ({ targetType, targetId, reason, detail }) => {
+  if (isSubmittingReport.value) return
+  isSubmittingReport.value = true
+  try {
+    const ok = await submitReport({ targetType, targetId, reason, detail })
+    if (ok) reportDialogVisible.value = false
+  } finally {
+    isSubmittingReport.value = false
+  }
 }
 const deleteComment = async () => {
   const token = getToken()

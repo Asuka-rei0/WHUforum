@@ -38,14 +38,25 @@
               <span class="status-pill" :class="statusClass(report.status)">
                 {{ statusText(report.status) }}
               </span>
-              <span>{{ report.targetType }} #{{ report.targetId }}</span>
+              <NuxtLink
+                v-if="getContentReportPostRoute(report)"
+                class="report-target-link"
+                :to="getContentReportPostRoute(report)"
+              >
+                {{ getContentReportTargetText(report.targetType) }} #{{ report.targetId }}
+              </NuxtLink>
+              <span v-else>{{ getContentReportTargetText(report.targetType) }} #{{ report.targetId }}</span>
               <time>{{ formatTime(report.createdAt) }}</time>
             </div>
             <h2>{{ report.targetTitle || '未命名内容' }}</h2>
             <p>{{ report.targetExcerpt || '暂无摘要' }}</p>
             <div class="report-meta">
               <span>举报人：{{ report.reporterUsername || '未知' }}</span>
-              <span>原因：{{ report.reason }}</span>
+              <span>原因：{{ getContentReportReasonText(report.reason) }}</span>
+            </div>
+            <div v-if="report.detail" class="report-detail">
+              <span>具体说明</span>
+              <p>{{ report.detail }}</p>
             </div>
             <textarea v-model="resolutionById[report.id]" placeholder="处理备注"></textarea>
             <div class="report-actions">
@@ -70,6 +81,11 @@ import { useToast } from 'vue-toastification'
 import BasePlaceholder from '~/components/BasePlaceholder.vue'
 import { authState, getToken, loadCurrentUser } from '~/utils/auth'
 import { getApiErrorMessage } from '~/utils/apiError'
+import {
+  getContentReportPostRoute,
+  getContentReportReasonText,
+  getContentReportTargetText,
+} from '~/utils/contentReport'
 
 definePageMeta({ middleware: ['auth-required'] })
 
@@ -254,6 +270,35 @@ onMounted(async () => {
   line-height: 1.7;
   margin: 0 0 10px;
   overflow-wrap: anywhere;
+}
+
+.report-target-link {
+  color: var(--primary-color);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.report-target-link:hover {
+  text-decoration: underline;
+}
+
+.report-detail {
+  background: var(--normal-light-background-color);
+  border-radius: 8px;
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+  padding: 10px 12px;
+}
+
+.report-detail span {
+  color: var(--menu-text-color);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.report-detail p {
+  margin: 0;
 }
 
 .report-item textarea {
