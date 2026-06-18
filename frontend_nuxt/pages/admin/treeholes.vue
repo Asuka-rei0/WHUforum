@@ -1,13 +1,13 @@
 <template>
   <div class="treehole-admin-page">
     <header class="admin-header">
-      <div>
+      <div class="admin-header-copy">
         <div class="admin-kicker">管理员后台</div>
         <h1>树洞复审与干预</h1>
         <p>处理 AI 上报的中高风险树洞，记录每一次复审、身份查看和干预动作。</p>
       </div>
       <button
-        class="refresh-button"
+        class="text-button"
         type="button"
         :disabled="loadingCases"
         @click="loadCases(true)"
@@ -23,73 +23,97 @@
     </div>
 
     <template v-else>
-      <div class="filters">
-        <label>
-          <span>风险等级</span>
-          <select v-model="riskLevel">
-            <option value="">全部</option>
-            <option value="L2">L2 中风险</option>
-            <option value="L3">L3 高风险</option>
-            <option value="L4">L4 紧急风险</option>
-          </select>
-        </label>
-        <label>
-          <span>处理状态</span>
-          <select v-model="caseStatus">
-            <option value="">全部</option>
-            <option value="OPEN">待处理</option>
-            <option value="IN_PROGRESS">处理中</option>
-            <option value="CONTACTED">已联系学生</option>
-            <option value="TRANSFERRED">已转交</option>
-            <option value="CLOSED">已关闭</option>
-          </select>
-        </label>
-      </div>
+      <section class="filter-panel" aria-label="树洞复审筛选">
+        <div class="filters">
+          <label>
+            <span>风险等级</span>
+            <select v-model="riskLevel">
+              <option value="">全部</option>
+              <option value="L2">L2 中风险</option>
+              <option value="L3">L3 高风险</option>
+              <option value="L4">L4 紧急风险</option>
+            </select>
+          </label>
+          <label>
+            <span>处理状态</span>
+            <select v-model="caseStatus">
+              <option value="">全部</option>
+              <option value="OPEN">待处理</option>
+              <option value="IN_PROGRESS">处理中</option>
+              <option value="CONTACTED">已联系学生</option>
+              <option value="TRANSFERRED">已转交</option>
+              <option value="CLOSED">已关闭</option>
+            </select>
+          </label>
+        </div>
+        <div class="queue-count">
+          <strong>{{ cases.length }}</strong>
+          <span>条记录</span>
+        </div>
+      </section>
 
-      <div class="workspace">
-        <section class="case-list" aria-label="风险树洞列表">
+      <div class="review-workspace">
+        <section class="case-list-panel" aria-label="风险树洞列表">
+          <div class="panel-title-row">
+            <h2>风险队列</h2>
+            <span>{{ loadingCases ? '加载中' : '按更新时间排序' }}</span>
+          </div>
+
           <div v-if="loadingCases" class="loading-block">
             <l-hatch size="28" stroke="4" speed="3.5" color="var(--primary-color)"></l-hatch>
           </div>
-          <button
-            v-for="item in cases"
-            :key="item.id"
-            class="case-row"
-            :class="{
-              selected: selectedPostId === item.postId,
-              urgent: isUrgent(item.post?.treeholeRiskLevel),
-            }"
-            type="button"
-            :disabled="loadingDetail"
-            @click="selectCase(item)"
-          >
-            <div class="case-row-top">
-              <span class="risk-badge" :class="riskClass(item.post?.treeholeRiskLevel)">
-                {{ item.post?.treeholeRiskLevel || '未知' }}
-              </span>
-              <span class="case-status">{{ statusText(item.status) }}</span>
-            </div>
-            <div class="case-title">{{ item.post?.title || '未命名树洞' }}</div>
-            <div class="case-meta">
-              {{ reviewStatusText(item.post?.treeholeReviewStatus) }} ·
-              {{ expectedText(item.post?.treeholeExpectedVisibility) }}
-            </div>
-          </button>
-          <BasePlaceholder v-if="!loadingCases && cases.length === 0" text="暂无待复审树洞" />
+
+          <div v-else class="case-list">
+            <button
+              v-for="item in cases"
+              :key="item.id"
+              class="case-row"
+              :class="{
+                selected: selectedPostId === item.postId,
+                urgent: isUrgent(item.post?.treeholeRiskLevel),
+              }"
+              type="button"
+              :disabled="loadingDetail"
+              @click="selectCase(item)"
+            >
+              <div class="case-row-top">
+                <span class="risk-badge" :class="riskClass(item.post?.treeholeRiskLevel)">
+                  {{ item.post?.treeholeRiskLevel || '未知' }}
+                </span>
+                <span class="status-pill" :class="statusClass(item.status)">
+                  {{ statusText(item.status) }}
+                </span>
+              </div>
+              <div class="case-title">{{ item.post?.title || '未命名树洞' }}</div>
+              <div class="case-reason">
+                {{ truncateText(item.post?.treeholeRiskReason, 58) }}
+              </div>
+              <div class="case-meta">
+                树洞 #{{ item.postId }} ·
+                {{ reviewStatusText(item.post?.treeholeReviewStatus) }} ·
+                {{ expectedText(item.post?.treeholeExpectedVisibility) }}
+              </div>
+            </button>
+            <BasePlaceholder v-if="cases.length === 0" text="暂无待复审树洞" />
+          </div>
         </section>
 
         <section v-if="detail" class="detail-panel">
           <div class="detail-head" :class="{ urgent: isUrgent(detail.post?.treeholeRiskLevel) }">
-            <div>
+            <div class="detail-heading">
               <div class="detail-label">树洞 #{{ detail.post?.id }}</div>
-              <h2>{{ detail.post?.title }}</h2>
+              <h2>{{ detail.post?.title || '未命名树洞' }}</h2>
+              <div class="detail-subline">
+                <span>{{ reviewStatusText(detail.post?.treeholeReviewStatus) }}</span>
+                <span>{{ statusText(detail.caseInfo?.status) }}</span>
+              </div>
             </div>
             <span class="risk-badge large" :class="riskClass(detail.post?.treeholeRiskLevel)">
               {{ detail.post?.treeholeRiskLevel || '未知' }}
             </span>
           </div>
 
-          <div class="detail-grid">
+          <div class="status-grid">
             <div>
               <span>用户期望</span>
               <strong>{{ expectedText(detail.post?.treeholeExpectedVisibility) }}</strong>
@@ -100,7 +124,7 @@
             </div>
             <div>
               <span>帖子状态</span>
-              <strong>{{ detail.post?.status }}</strong>
+              <strong>{{ postStatusText(detail.post?.status) }}</strong>
             </div>
             <div>
               <span>处理状态</span>
@@ -108,22 +132,25 @@
             </div>
           </div>
 
-          <div class="content-section">
+          <section class="info-section">
             <h3>树洞原文</h3>
-            <p class="treehole-content">{{ detail.post?.content }}</p>
-          </div>
+            <p class="treehole-content">{{ detail.post?.content || '暂无内容' }}</p>
+          </section>
 
-          <div class="content-section">
-            <h3>AI 风险评估</h3>
+          <section class="info-section risk-section">
+            <div class="section-title-row">
+              <h3>AI 风险评估</h3>
+              <span>{{ detail.post?.treeholeReviewedAt ? formatTime(detail.post.treeholeReviewedAt) : '' }}</span>
+            </div>
             <p>{{ detail.post?.treeholeRiskReason || '暂无风险原因' }}</p>
             <p class="recommended-action">
               {{ detail.post?.treeholeRecommendedAction || '暂无建议动作' }}
             </p>
-          </div>
+          </section>
 
-          <div class="identity-section">
+          <section class="info-section identity-section">
             <div class="section-title-row">
-              <h3>真实身份查看</h3>
+              <h3>真实身份</h3>
               <span>查看会自动留痕</span>
             </div>
             <div class="identity-form">
@@ -133,6 +160,7 @@
                 :disabled="revealingAuthor"
               />
               <button
+                class="text-button primary"
                 type="button"
                 :disabled="revealingAuthor || !revealReason.trim()"
                 @click="revealAuthor"
@@ -141,18 +169,70 @@
                 {{ revealingAuthor ? '查看中...' : '查看真实身份' }}
               </button>
             </div>
-            <div v-if="identity" class="identity-result">
-              <span>ID: {{ identity.id }}</span>
-              <span>用户名: {{ identity.username }}</span>
-              <span>邮箱: {{ identity.email }}</span>
-              <span>校园身份: {{ identity.campusPersonType || '未知' }}</span>
-              <span>院系: {{ identity.department || '未知' }}</span>
-              <span>校园认证: {{ identity.campusVerified ? '是' : '否' }}</span>
-              <span>校园 ID Hash: {{ identity.campusIdHash || '无' }}</span>
-            </div>
-          </div>
 
-          <div class="actions-section">
+            <div v-if="identity" class="identity-result">
+              <div class="identity-summary">
+                <div class="identity-avatar">
+                  <user-icon />
+                </div>
+                <div class="identity-main">
+                  <strong>{{ identity.username || '未知用户' }}</strong>
+                  <span>{{ identity.email || '未登记邮箱' }}</span>
+                </div>
+                <div class="identity-actions">
+                  <button
+                    class="text-button primary"
+                    type="button"
+                    :disabled="messagingAuthor"
+                    @click="messageAuthor"
+                  >
+                    <message-one class="button-icon" />
+                    {{ messagingAuthor ? '打开中...' : '发私信' }}
+                  </button>
+                  <button
+                    v-if="identity.email"
+                    class="text-button"
+                    type="button"
+                    @click="copyIdentityEmail"
+                  >
+                    复制邮箱
+                  </button>
+                </div>
+              </div>
+              <dl class="identity-fields">
+                <div>
+                  <dt>用户 ID</dt>
+                  <dd>{{ identity.id }}</dd>
+                </div>
+                <div>
+                  <dt>注册邮箱</dt>
+                  <dd>{{ identity.email || '未登记' }}</dd>
+                </div>
+                <div>
+                  <dt>校园身份</dt>
+                  <dd>{{ identity.campusPersonType || '未知' }}</dd>
+                </div>
+                <div>
+                  <dt>院系</dt>
+                  <dd>{{ identity.department || '未知' }}</dd>
+                </div>
+                <div>
+                  <dt>校园认证</dt>
+                  <dd>{{ identity.campusVerified ? '已认证' : '未认证' }}</dd>
+                </div>
+                <div>
+                  <dt>校园 ID Hash</dt>
+                  <dd>{{ identity.campusIdHash || '无' }}</dd>
+                </div>
+              </dl>
+            </div>
+          </section>
+
+          <section class="info-section actions-section">
+            <div class="section-title-row">
+              <h3>处置动作</h3>
+              <span v-if="isClosed">该处置单已关闭</span>
+            </div>
             <textarea v-model="actionNote" placeholder="填写处理备注"></textarea>
             <div class="action-buttons">
               <button
@@ -169,24 +249,27 @@
                 {{ action.label }}
               </button>
             </div>
-          </div>
+          </section>
 
-          <div class="records-section">
+          <section class="info-section records-section">
             <h3>处理记录</h3>
-            <div v-for="record in detail.records" :key="record.id" class="record-item">
-              <div class="record-main">
-                <span>{{ actionText(record.action) }}</span>
-                <time>{{ formatTime(record.createdAt) }}</time>
+            <div v-if="detail.records?.length" class="record-list">
+              <div v-for="record in detail.records" :key="record.id" class="record-item">
+                <div class="record-main">
+                  <span>{{ actionText(record.action) }}</span>
+                  <time>{{ formatTime(record.createdAt) }}</time>
+                </div>
+                <div class="record-meta">
+                  {{ record.adminUsername || '系统' }} · {{ statusText(record.fromStatus) }} ->
+                  {{ statusText(record.toStatus) }} ·
+                  {{ reviewStatusText(record.fromReviewStatus) }} ->
+                  {{ reviewStatusText(record.toReviewStatus) }}
+                </div>
+                <p v-if="record.note">{{ record.note }}</p>
               </div>
-              <div class="record-meta">
-                {{ record.adminUsername || '系统' }} · {{ statusText(record.fromStatus) }} →
-                {{ statusText(record.toStatus) }} ·
-                {{ reviewStatusText(record.fromReviewStatus) }} →
-                {{ reviewStatusText(record.toReviewStatus) }}
-              </div>
-              <p v-if="record.note">{{ record.note }}</p>
             </div>
-          </div>
+            <BasePlaceholder v-else text="暂无处理记录" />
+          </section>
         </section>
 
         <section v-else class="detail-panel empty-detail">
@@ -216,6 +299,7 @@ const loadingCases = ref(false)
 const loadingDetail = ref(false)
 const submittingAction = ref(false)
 const revealingAuthor = ref(false)
+const messagingAuthor = ref(false)
 const riskLevel = ref('')
 const caseStatus = ref('')
 const actionNote = ref('')
@@ -262,6 +346,7 @@ const loadCases = async (reset = false) => {
         await selectCase(first)
       } else {
         detail.value = null
+        identity.value = null
         selectedPostId.value = null
       }
     }
@@ -272,24 +357,36 @@ const loadCases = async (reset = false) => {
   }
 }
 
-const selectCase = async (item) => {
-  if (!item?.postId || loadingDetail.value) return
-  selectedPostId.value = item.postId
-  identity.value = null
-  revealReason.value = ''
+const loadDetail = async (postId, options = {}) => {
+  if (!postId || loadingDetail.value) return
+  const preserveIdentity = options.preserveIdentity === true
+  const currentIdentity = preserveIdentity ? identity.value : null
+  if (!preserveIdentity) {
+    identity.value = null
+    revealReason.value = ''
+  }
   loadingDetail.value = true
   try {
-    const res = await fetch(`${API_BASE_URL}/api/admin/treeholes/${item.postId}`, {
+    const res = await fetch(`${API_BASE_URL}/api/admin/treeholes/${postId}`, {
       headers: authHeaders(),
     })
     if (!res.ok) throw new Error(await readError(res))
     detail.value = await res.json()
+    if (preserveIdentity) {
+      identity.value = currentIdentity
+    }
     actionNote.value = detail.value?.caseInfo?.note || ''
   } catch (e) {
     toast.error(e.message || '加载树洞复审详情失败')
   } finally {
     loadingDetail.value = false
   }
+}
+
+const selectCase = async (item) => {
+  if (!item?.postId || loadingDetail.value) return
+  selectedPostId.value = item.postId
+  await loadDetail(item.postId)
 }
 
 const executeAction = async (action) => {
@@ -326,13 +423,13 @@ const revealAuthor = async () => {
       {
         method: 'POST',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: revealReason.value }),
+        body: JSON.stringify({ reason: revealReason.value.trim() }),
       },
     )
     if (!res.ok) throw new Error(await readError(res))
     identity.value = await res.json()
-    toast.success('真实身份已记录查看日志')
-    await selectCase({ postId: selectedPostId.value })
+    toast.success('已获取发布者账号，查看记录已留痕')
+    await loadDetail(selectedPostId.value, { preserveIdentity: true })
   } catch (e) {
     toast.error(e.message || '查看真实身份失败')
   } finally {
@@ -340,17 +437,57 @@ const revealAuthor = async () => {
   }
 }
 
+const messageAuthor = async () => {
+  if (!identity.value?.id || messagingAuthor.value) return
+  if (Number(identity.value.id) === Number(authState.userId)) {
+    toast.error('不能给自己发私信')
+    return
+  }
+  messagingAuthor.value = true
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/messages/conversations`, {
+      method: 'POST',
+      headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipientId: identity.value.id }),
+    })
+    if (!res.ok) throw new Error(await readError(res))
+    const result = await res.json()
+    await navigateTo(`/message-box/${result.conversationId}`)
+  } catch (e) {
+    toast.error(e.message || '无法发起私信')
+  } finally {
+    messagingAuthor.value = false
+  }
+}
+
+const copyIdentityEmail = async () => {
+  if (!identity.value?.email || !import.meta.client || !navigator?.clipboard) return
+  try {
+    await navigator.clipboard.writeText(identity.value.email)
+    toast.success('邮箱已复制')
+  } catch {
+    toast.error('复制失败')
+  }
+}
+
 const readError = async (res) => {
   try {
     const body = await res.json()
-    return body.error || '请求失败'
+    return body.error || body.message || '请求失败'
   } catch {
     return '请求失败'
   }
 }
 
+const truncateText = (value, maxLength = 60) => {
+  const text = String(value || '').replace(/\s+/g, ' ').trim()
+  if (!text) return '暂无风险原因'
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text
+}
+
 const isUrgent = (level) => level === 'L3' || level === 'L4'
 const riskClass = (level) => `risk-${String(level || 'unknown').toLowerCase()}`
+const statusClass = (value) => `status-${String(value || 'none').toLowerCase()}`
 
 const expectedText = (value) =>
   ({
@@ -367,6 +504,14 @@ const reviewStatusText = (value) =>
     PUBLIC_RESTRICTED: '限制公开',
     REPORTED: '已上报管理员',
   })[value] || '未知'
+
+const postStatusText = (value) =>
+  ({
+    PUBLISHED: '已发布',
+    PENDING: '待处理',
+    DELETED: '已删除',
+    REJECTED: '已拒绝',
+  })[value] || value || '未知'
 
 const statusText = (value) =>
   ({
@@ -407,64 +552,100 @@ onMounted(async () => {
 
 <style scoped>
 .treehole-admin-page {
-  padding: 24px;
+  --admin-muted: var(--menu-text-color);
+  --admin-border: var(--normal-border-color);
+  --admin-panel: var(--background-color);
+  --admin-soft: var(--normal-light-background-color);
+  --admin-success: #047857;
+  --admin-warning: #9a3412;
+  --admin-danger: #b42318;
+
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 24px 18px 48px;
   color: var(--text-color);
 }
 
 .admin-header,
+.filter-panel,
 .filters,
-.workspace,
+.review-workspace,
+.panel-title-row,
+.case-row-top,
 .detail-head,
+.detail-subline,
 .section-title-row,
 .identity-form,
+.identity-summary,
+.identity-actions,
 .action-buttons,
 .record-main {
   display: flex;
-  gap: 12px;
 }
 
 .admin-header {
-  justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 18px;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid var(--admin-border);
+  margin-bottom: 16px;
+  padding-bottom: 18px;
 }
 
-.admin-kicker,
-.detail-label,
-.case-meta,
-.record-meta,
-.section-title-row span {
-  color: var(--text-color-secondary);
-  font-size: 13px;
+.admin-header-copy {
+  min-width: 0;
 }
 
-.admin-header h1,
-.detail-head h2 {
-  margin: 4px 0 6px;
+.admin-kicker {
+  color: var(--primary-color);
+  font-size: 14px;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.admin-header h1 {
+  color: var(--text-color);
+  font-size: 26px;
+  line-height: 1.25;
+  margin: 0;
 }
 
 .admin-header p {
-  margin: 0;
-  color: var(--text-color-secondary);
+  color: var(--admin-muted);
+  line-height: 1.7;
+  margin: 8px 0 0;
 }
 
-.refresh-button,
-.identity-form button,
+.text-button,
 .action-buttons button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 9px 12px;
-  background: var(--background-color-secondary);
+  min-height: 36px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-panel);
   color: var(--text-color);
   cursor: pointer;
+  font: inherit;
+  padding: 0 12px;
+  text-decoration: none;
 }
 
-.refresh-button:disabled,
-.identity-form button:disabled,
+.text-button.primary {
+  border-color: var(--primary-color);
+  background: var(--primary-color);
+  color: white;
+}
+
+.text-button:hover:not(:disabled),
+.action-buttons button:hover:not(:disabled) {
+  border-color: var(--primary-color);
+}
+
+.text-button:disabled,
+.action-buttons button:disabled,
 .case-row:disabled {
   cursor: not-allowed;
   opacity: 0.55;
@@ -473,295 +654,567 @@ onMounted(async () => {
 .button-icon {
   width: 16px;
   height: 16px;
+  flex-shrink: 0;
+}
+
+.filter-panel {
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-panel);
+  margin-bottom: 16px;
+  padding: 14px;
 }
 
 .filters {
-  margin-bottom: 16px;
   flex-wrap: wrap;
+  gap: 12px;
 }
 
 .filters label {
   display: grid;
   gap: 6px;
+  color: var(--admin-muted);
   font-size: 13px;
-  color: var(--text-color-secondary);
 }
 
 .filters select,
 .identity-form input,
 .actions-section textarea {
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  background: var(--background-color-secondary);
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-panel);
   color: var(--text-color);
+  font: inherit;
 }
 
 .filters select {
-  min-width: 150px;
+  min-width: 160px;
   padding: 8px 10px;
 }
 
-.workspace {
-  align-items: stretch;
+.queue-count {
+  color: var(--admin-muted);
+  display: grid;
+  gap: 2px;
+  justify-items: end;
+  white-space: nowrap;
+}
+
+.queue-count strong {
+  color: var(--primary-color);
+  font-size: 22px;
+  line-height: 1;
+}
+
+.queue-count span {
+  font-size: 12px;
+}
+
+.review-workspace {
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.case-list-panel,
+.detail-panel {
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  background: var(--admin-panel);
+}
+
+.case-list-panel {
+  flex: 0 0 330px;
+  padding: 14px;
+}
+
+.panel-title-row {
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--admin-border);
+  margin-bottom: 12px;
+  padding-bottom: 10px;
+}
+
+.panel-title-row h2 {
+  color: var(--text-color);
+  font-size: 16px;
+  margin: 0;
+}
+
+.panel-title-row span,
+.case-meta,
+.case-reason,
+.detail-label,
+.detail-subline,
+.section-title-row span,
+.record-main time,
+.record-meta {
+  color: var(--admin-muted);
+  font-size: 12px;
 }
 
 .case-list {
-  width: 330px;
   display: grid;
-  align-content: start;
   gap: 10px;
 }
 
 .case-row {
-  text-align: left;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--admin-border);
   border-radius: 8px;
-  padding: 12px;
-  background: var(--background-color-secondary);
+  background: var(--admin-panel);
   color: var(--text-color);
   cursor: pointer;
+  padding: 12px;
+  text-align: left;
+  transition:
+    border-color 0.18s ease,
+    transform 0.18s ease;
 }
 
+.case-row:hover:not(:disabled),
 .case-row.selected {
   border-color: var(--primary-color);
 }
 
+.case-row:hover:not(:disabled) {
+  transform: translateY(-1px);
+}
+
 .case-row.urgent {
-  border-color: #f97316;
+  border-left-color: var(--admin-danger);
+  border-left-width: 3px;
 }
 
 .case-row-top {
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 9px;
 }
 
 .case-title {
+  font-size: 15px;
   font-weight: 700;
+  line-height: 1.4;
   margin-bottom: 6px;
-  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
-.case-status {
-  font-size: 12px;
-  color: var(--text-color-secondary);
+.case-reason {
+  line-height: 1.5;
+  margin-bottom: 7px;
 }
 
-.risk-badge {
-  display: inline-flex;
+.risk-badge,
+.status-pill {
   align-items: center;
-  justify-content: center;
-  min-width: 40px;
   border-radius: 999px;
-  padding: 3px 8px;
+  display: inline-flex;
   font-size: 12px;
   font-weight: 700;
+  justify-content: center;
+  line-height: 1;
+  min-height: 24px;
+  padding: 0 9px;
+  white-space: nowrap;
 }
 
 .risk-badge.large {
-  min-width: 52px;
-  padding: 6px 10px;
+  min-height: 30px;
+  min-width: 54px;
 }
 
 .risk-l2 {
-  background: #fef3c7;
-  color: #92400e;
+  background: rgba(245, 158, 11, 0.14);
+  color: #8a5a00;
 }
 
 .risk-l3 {
-  background: #fed7aa;
-  color: #9a3412;
+  background: rgba(249, 115, 22, 0.16);
+  color: var(--admin-warning);
 }
 
 .risk-l4 {
-  background: #fecaca;
-  color: #991b1b;
+  background: rgba(244, 63, 94, 0.16);
+  color: var(--admin-danger);
 }
 
 .risk-unknown {
-  background: var(--background-color);
-  color: var(--text-color-secondary);
+  background: var(--admin-soft);
+  color: var(--admin-muted);
+}
+
+.status-pill {
+  border: 1px solid var(--admin-border);
+  color: var(--admin-muted);
+  font-weight: 600;
+}
+
+.status-open,
+.status-in_progress {
+  color: #8a5a00;
+}
+
+.status-contacted,
+.status-transferred {
+  color: var(--primary-color);
+}
+
+.status-closed {
+  color: var(--admin-success);
 }
 
 .detail-panel {
   flex: 1;
   min-width: 0;
-  border: 1px solid var(--border-color);
-  border-radius: 8px;
   padding: 18px;
-  background: var(--background-color-secondary);
 }
 
 .detail-head {
-  justify-content: space-between;
   align-items: flex-start;
-  border-bottom: 1px solid var(--border-color);
+  justify-content: space-between;
+  gap: 14px;
+  border-bottom: 1px solid var(--admin-border);
   padding-bottom: 14px;
 }
 
 .detail-head.urgent {
-  border-bottom-color: #f97316;
+  border-bottom-color: rgba(244, 63, 94, 0.5);
 }
 
-.detail-grid {
+.detail-heading {
+  min-width: 0;
+}
+
+.detail-label {
+  margin-bottom: 5px;
+}
+
+.detail-head h2 {
+  color: var(--text-color);
+  font-size: 22px;
+  line-height: 1.35;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.detail-subline {
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.detail-subline span + span::before {
+  content: '·';
+  margin-right: 8px;
+}
+
+.status-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  margin: 16px 0;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin: 16px 0 2px;
 }
 
-.detail-grid div,
-.identity-result {
-  border: 1px solid var(--border-color);
-  border-radius: 6px;
-  padding: 10px;
-  background: var(--background-color);
+.status-grid div {
+  border-left: 3px solid var(--admin-border);
+  padding: 2px 10px;
 }
 
-.detail-grid span,
-.detail-grid strong {
+.status-grid span,
+.status-grid strong {
   display: block;
 }
 
-.detail-grid span {
+.status-grid span {
+  color: var(--admin-muted);
   font-size: 12px;
-  color: var(--text-color-secondary);
-  margin-bottom: 4px;
+  margin-bottom: 5px;
 }
 
-.content-section,
-.identity-section,
-.actions-section,
-.records-section {
+.status-grid strong {
+  font-size: 14px;
+  line-height: 1.35;
+}
+
+.info-section {
+  border-top: 1px solid var(--admin-border);
   margin-top: 18px;
+  padding-top: 16px;
 }
 
-.content-section h3,
-.identity-section h3,
-.records-section h3 {
-  margin: 0 0 8px;
+.info-section h3 {
+  color: var(--text-color);
   font-size: 16px;
+  margin: 0 0 10px;
 }
 
 .treehole-content,
-.content-section p {
-  white-space: pre-wrap;
-  line-height: 1.7;
+.info-section p {
+  line-height: 1.75;
   margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.risk-section {
+  border-top-color: rgba(10, 110, 120, 0.28);
 }
 
 .recommended-action {
-  margin-top: 8px;
   color: var(--primary-color);
+  margin-top: 8px !important;
 }
 
 .section-title-row {
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .identity-form {
-  margin-top: 8px;
+  align-items: stretch;
+  gap: 10px;
 }
 
 .identity-form input {
   flex: 1;
-  padding: 9px 10px;
+  min-width: 0;
+  padding: 0 11px;
 }
 
 .identity-result {
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  margin-top: 12px;
+  overflow: hidden;
+}
+
+.identity-summary {
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--admin-border);
+  padding: 12px;
+}
+
+.identity-avatar {
+  align-items: center;
+  background: var(--admin-soft);
+  border-radius: 50%;
+  color: var(--primary-color);
+  display: flex;
+  flex: 0 0 38px;
+  height: 38px;
+  justify-content: center;
+  width: 38px;
+}
+
+.identity-main {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  flex: 1;
+  gap: 3px;
+  min-width: 0;
+}
+
+.identity-main strong,
+.identity-main span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.identity-main span {
+  color: var(--admin-muted);
+  font-size: 13px;
+}
+
+.identity-actions {
+  flex-wrap: wrap;
   gap: 8px;
-  margin-top: 10px;
+  justify-content: flex-end;
+}
+
+.identity-fields {
+  display: grid;
+  gap: 0;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 0;
+}
+
+.identity-fields div {
+  border-bottom: 1px solid var(--admin-border);
+  min-width: 0;
+  padding: 10px 12px;
+}
+
+.identity-fields div:nth-last-child(-n + 2) {
+  border-bottom: 0;
+}
+
+.identity-fields dt {
+  color: var(--admin-muted);
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.identity-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .actions-section textarea {
-  width: 100%;
-  min-height: 86px;
-  resize: vertical;
-  padding: 10px;
   box-sizing: border-box;
+  min-height: 84px;
+  padding: 10px 11px;
+  resize: vertical;
+  width: 100%;
 }
 
 .action-buttons {
   flex-wrap: wrap;
+  gap: 9px;
   margin-top: 10px;
 }
 
-.action-buttons button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
 .action-buttons .positive {
-  border-color: #16a34a;
-  color: #166534;
+  border-color: rgba(4, 120, 87, 0.45);
+  color: var(--admin-success);
 }
 
 .action-buttons .danger {
-  border-color: #dc2626;
-  color: #991b1b;
+  border-color: rgba(180, 35, 24, 0.45);
+  color: var(--admin-danger);
+}
+
+.record-list {
+  display: grid;
+  gap: 14px;
 }
 
 .record-item {
-  border-left: 3px solid var(--border-color);
-  padding: 0 0 14px 12px;
+  border-left: 3px solid var(--admin-border);
+  padding-left: 12px;
 }
 
 .record-main {
+  align-items: baseline;
+  gap: 10px;
   justify-content: space-between;
+}
+
+.record-main span {
   font-weight: 700;
 }
 
-.record-main time,
 .record-meta {
-  color: var(--text-color-secondary);
-  font-size: 12px;
+  line-height: 1.5;
+  margin-top: 4px;
 }
 
 .record-item p {
+  line-height: 1.7;
   margin: 6px 0 0;
+  overflow-wrap: anywhere;
   white-space: pre-wrap;
 }
 
 .loading-block,
 .access-denied,
 .empty-detail {
-  display: flex;
   align-items: center;
+  display: flex;
   justify-content: center;
   min-height: 260px;
 }
 
 .access-denied {
+  border: 1px solid var(--admin-border);
+  border-radius: 8px;
+  color: var(--admin-muted);
   gap: 10px;
-  color: var(--text-color-secondary);
 }
 
 .access-icon {
-  width: 22px;
   height: 22px;
+  width: 22px;
 }
 
-@media (max-width: 960px) {
-  .treehole-admin-page {
-    padding: 16px;
-  }
-
-  .admin-header,
-  .workspace {
+@media (max-width: 980px) {
+  .review-workspace {
     flex-direction: column;
   }
 
-  .case-list {
+  .case-list-panel {
+    flex-basis: auto;
     width: 100%;
   }
 
-  .detail-grid,
-  .identity-result {
+  .detail-panel {
+    box-sizing: border-box;
+    width: 100%;
+  }
+
+  .status-grid,
+  .identity-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 700px) {
+  .treehole-admin-page {
+    padding: 16px 14px 36px;
+  }
+
+  .admin-header,
+  .filter-panel,
+  .identity-summary {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .queue-count {
+    justify-items: start;
+  }
+
+  .filters,
+  .filters label,
+  .filters select,
+  .text-button,
+  .identity-form,
+  .identity-actions,
+  .action-buttons button {
+    width: 100%;
+  }
+
+  .identity-form {
+    flex-direction: column;
+  }
+
+  .identity-form input {
+    min-height: 38px;
+  }
+
+  .status-grid,
+  .identity-fields {
     grid-template-columns: 1fr;
+  }
+
+  .identity-fields div:nth-last-child(-n + 2) {
+    border-bottom: 1px solid var(--admin-border);
+  }
+
+  .identity-fields div:last-child {
+    border-bottom: 0;
+  }
+
+  .record-main {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 3px;
   }
 }
 </style>
