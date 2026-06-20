@@ -1,0 +1,36 @@
+export const notificationTypeLabels = {
+  POST_VIEWED: '帖子被查看',
+  COMMENT_REPLY: '有人回复了你',
+  REACTION: '有人点赞',
+  POST_REVIEW_REQUEST: '帖子待审核',
+  POST_REVIEWED: '帖子审核结果',
+  POST_DELETED: '帖子被删除',
+  POST_UPDATED: '关注的帖子有新评论',
+  POST_SUBSCRIBED: '有人订阅了你的文章',
+  POST_UNSUBSCRIBED: '有人取消订阅你的文章',
+  FOLLOWED_POST: '关注的用户发布了新文章',
+  USER_FOLLOWED: '有人关注了你',
+  USER_UNFOLLOWED: '有人取消关注你',
+  USER_ACTIVITY: '关注的用户有新动态',
+  REGISTER_REQUEST: '有人申请注册',
+  ACTIVITY_REDEEM: '有人申请兑换奶茶',
+  POINT_REDEEM: '有人申请积分兑换',
+  LOTTERY_WIN: '抽奖中奖了',
+  LOTTERY_DRAW: '抽奖已开奖',
+  POLL_VOTE: '有人参与你的投票',
+  POLL_RESULT_OWNER: '发布的投票结果已公布',
+  POLL_RESULT_PARTICIPANT: '参与的投票结果已公布',
+  CATEGORY_PROPOSAL_RESULT_OWNER: '分类提案结果已公布',
+  CATEGORY_PROPOSAL_RESULT_PARTICIPANT: '参与的分类提案结果已公布',
+  POST_FEATURED: '文章被精选',
+  DONATION: '有人打赏了你',
+  MENTION: '有人提到了你',
+  FLEA_MARKET_STATUS: '跳蚤市场状态更新',
+  MODERATION_ALERT: '内容审核提醒',
+  CONTENT_REPORT: '内容举报',
+  CONTENT_REPORT_REVIEWED: '举报处理结果',
+}
+
+export function getNotificationTypeLabel(type) {
+  return notificationTypeLabels[type] || type
+}

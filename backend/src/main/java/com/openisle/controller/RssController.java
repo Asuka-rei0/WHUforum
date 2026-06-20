@@ -87,9 +87,9 @@ public class RssController {
     sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
     sb.append("<rss version=\"2.0\" xmlns:content=\"http://purl.org/rss/1.0/modules/content/\">");
     sb.append("<channel>");
-    elem(sb, "title", cdata("OpenIsle RSS"));
+    elem(sb, "title", cdata("珞珈论坛 RSS"));
     elem(sb, "link", base + "/");
-    elem(sb, "description", cdata("Latest posts"));
+    elem(sb, "description", cdata("珞珈论坛最新帖子"));
     ZonedDateTime updated = posts
       .stream()
       .map(p -> p.getCreatedAt().atZone(ZoneId.systemDefault()))

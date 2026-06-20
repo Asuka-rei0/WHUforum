@@ -10,33 +10,38 @@ description: 珞珈论坛后端服务开发指南
 ## 技术栈
 
 - **Spring Boot** - 主框架
-- **Spring Security** - 安全认证
-- **MyBatis** - 数据访问层
+- **Spring Security** - 安全认证与 JWT 鉴权
+- **Spring Data JPA** - 数据访问层
 - **MySQL** - 数据库
-- **Redis** - 缓存和会话存储
+- **Redis** - 缓存
+- **RabbitMQ** - 异步消息与通知
+- **OpenSearch** - 全文搜索（可选）
 
 ## 项目结构
 
 ```
 backend/
-├── src/main/java/com/
+├── src/main/java/com/openisle/
 │   ├── controller/     # 控制器层
 │   ├── service/        # 业务逻辑层
-│   ├── mapper/         # 数据访问层
-│   ├── entity/         # 实体类
-│   └── config/         # 配置类
+│   ├── repository/     # JPA 数据访问
+│   ├── model/          # 实体与枚举
+│   ├── dto/            # 对外契约
+│   ├── mapper/         # DTO 映射
+│   ├── config/         # 配置类
+│   └── search/         # OpenSearch 索引同步
 └── src/main/resources/
     ├── application.properties
-    └── mapper/         # MyBatis 映射文件
+    └── db/migration/   # Flyway 数据库迁移
 ```
 
 ## 开发环境设置
 
 1. 安装 Java 17+
-2. 安装 MySQL 8.0+
-3. 安装 Redis
-4. 配置数据库连接
-5. 启动应用
+2. 安装 Maven 3.9+
+3. 启动 MySQL、Redis、RabbitMQ（推荐 Docker Compose）
+4. 复制根目录 `.env.example` 为 `.env` 并配置连接信息
+5. 启动应用：`cd backend && mvn spring-boot:run`
 
 ## API 接口
 

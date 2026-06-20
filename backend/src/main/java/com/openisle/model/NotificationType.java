@@ -62,4 +62,6 @@ public enum NotificationType {
   MODERATION_ALERT,
   /** A user submitted a content report for admin review */
   CONTENT_REPORT,
+  /** A content report submitted by the user was reviewed by an admin */
+  CONTENT_REPORT_REVIEWED,
 }

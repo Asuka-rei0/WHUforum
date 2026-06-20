@@ -4,6 +4,17 @@
       <l-hatch size="28" stroke="4" speed="3.5" color="var(--primary-color)"></l-hatch>
     </div>
 
+    <BasePlaceholder
+      v-else-if="loadError"
+      text="活动列表加载失败，请稍后重试"
+      icon="inbox"
+    />
+    <BasePlaceholder
+      v-else-if="activities.length === 0"
+      text="暂无进行中的活动"
+      icon="inbox"
+    />
+
     <div class="activity-list-page-card" v-for="a in activities" :key="a.id">
       <div class="activity-list-page-card-normal">
         <div v-if="a.icon" class="activity-card-normal-left">
@@ -32,14 +43,20 @@
 <script setup>
 import TimeManager from '~/utils/time'
 import MilkTeaActivityComponent from '~/components/MilkTeaActivityComponent.vue'
+import BasePlaceholder from '~/components/BasePlaceholder.vue'
+import { useToast } from 'vue-toastification'
+
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
+const toast = useToast()
 
 const activities = ref([])
 const isLoadingActivities = ref(false)
+const loadError = ref(false)
 
 onMounted(async () => {
   isLoadingActivities.value = true
+  loadError.value = false
   try {
     const res = await fetch(`${API_BASE_URL}/api/activities`)
     if (res.ok) {
@@ -47,9 +64,14 @@ onMounted(async () => {
       activities.value = Array.isArray(list)
         ? list.filter((activity) => activity.type !== 'INVITE_POINTS')
         : []
+    } else {
+      loadError.value = true
+      toast.error('活动列表加载失败，请稍后重试')
     }
   } catch (e) {
     console.error(e)
+    loadError.value = true
+    toast.error('活动列表加载失败，请稍后重试')
   } finally {
     isLoadingActivities.value = false
   }

@@ -9,7 +9,7 @@
             </ToolTip>
           </button>
           <span
-            v-if="isMobile && (unreadMessageCount > 0 || hasChannelUnread)"
+            v-if="isMobile && (unreadMessageCount > 0 || hasChannelUnread || siteNotificationUnread > 0)"
             class="menu-unread-dot"
           ></span>
         </div>
@@ -85,6 +85,7 @@
                   :disable-link="true"
                   :width="32"
                 />
+                <span v-if="siteNotificationUnread > 0" class="avatar-unread-dot"></span>
                 <down />
               </div>
             </template>
@@ -110,6 +111,8 @@ import BaseUserAvatar from '~/components/BaseUserAvatar.vue'
 import { authState, clearToken, getToken, loadCurrentUser } from '~/utils/auth'
 import { useUnreadCount } from '~/composables/useUnreadCount'
 import { useChannelsUnreadCount } from '~/composables/useChannelsUnreadCount'
+import { useSiteNotificationUnread } from '~/composables/useSiteNotificationUnread'
+import { notificationState } from '~/utils/notification'
 import { useIsMobile } from '~/utils/screen'
 import { themeState, cycleTheme, ThemeMode } from '~/utils/theme'
 import { toast } from '~/main'
@@ -127,6 +130,8 @@ const isLogin = computed(() => authState.loggedIn)
 const isMobile = useIsMobile()
 const { count: unreadMessageCount, fetchUnreadCount } = useUnreadCount()
 const { hasUnread: hasChannelUnread, fetchChannelUnread } = useChannelsUnreadCount()
+const { initialize: initSiteNotificationUnread } = useSiteNotificationUnread()
+const siteNotificationUnread = computed(() => notificationState.unreadCount)
 const showSearch = ref(false)
 const searchDropdown = ref(null)
 const userMenu = ref(null)
@@ -251,12 +256,22 @@ onMounted(async () => {
     if (authState.loggedIn) {
       fetchUnreadCount()
       fetchChannelUnread()
+      initSiteNotificationUnread()
     } else {
       fetchChannelUnread()
     }
   }
 
   await updateUnread()
+
+  watch(
+    () => authState.loggedIn,
+    (loggedIn) => {
+      if (loggedIn) {
+        initSiteNotificationUnread()
+      }
+    },
+  )
 
   // 新增的在线人数逻辑
   await sendPing()
@@ -392,6 +407,17 @@ onMounted(async () => {
   border-radius: 50%;
   background-color: lightgray;
   object-fit: cover;
+}
+
+.avatar-unread-dot {
+  position: absolute;
+  top: 0;
+  left: 24px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #ff4d4f;
+  border: 1px solid var(--background-color);
 }
 
 .dropdown-icon {

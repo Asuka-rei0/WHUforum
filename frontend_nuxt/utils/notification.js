@@ -24,6 +24,7 @@ const iconMap = {
   ACTIVITY_REDEEM: 'PaperMoneyTwo',
   POINT_REDEEM: 'Gift',
   CONTENT_REPORT: 'Report',
+  CONTENT_REPORT_REVIEWED: 'CheckCorrect',
   LOTTERY_WIN: 'MedalOne',
   LOTTERY_DRAW: 'Fireworks',
   POLL_VOTE: 'ChartHistogram',

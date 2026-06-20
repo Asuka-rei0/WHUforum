@@ -84,6 +84,7 @@ public class ContentReportService {
     User admin = userRepository
       .findByUsername(adminUsername)
       .orElseThrow(() -> new NotFoundException("Admin not found"));
+    ContentReportStatus previousStatus = report.getStatus();
     ContentReportStatus status = req != null && req.getStatus() != null
       ? req.getStatus()
       : ContentReportStatus.REVIEWING;
@@ -95,7 +96,11 @@ public class ContentReportService {
     if (status == ContentReportStatus.RESOLVED || status == ContentReportStatus.DISMISSED) {
       report.setHandledAt(LocalDateTime.now());
     }
-    return contentReportRepository.save(report);
+    ContentReport saved = contentReportRepository.save(report);
+    if (isTerminalReviewStatus(status) && !isTerminalReviewStatus(previousStatus)) {
+      notifyReporter(saved, status, admin);
+    }
+    return saved;
   }
 
   public long countOpen() {
@@ -171,6 +176,43 @@ public class ContentReportService {
         content
       );
     }
+  }
+
+  private void notifyReporter(ContentReport report, ContentReportStatus status, User admin) {
+    User reporter = report.getReporter();
+    if (reporter == null) {
+      return;
+    }
+    Boolean approved = status == ContentReportStatus.RESOLVED ? Boolean.TRUE : Boolean.FALSE;
+    notificationService.createNotification(
+      reporter,
+      NotificationType.CONTENT_REPORT_REVIEWED,
+      report.getPost(),
+      report.getComment(),
+      approved,
+      admin,
+      null,
+      buildReporterNotificationContent(report)
+    );
+  }
+
+  private String buildReporterNotificationContent(ContentReport report) {
+    StringBuilder content = new StringBuilder();
+    content
+      .append("举报 #")
+      .append(report.getId())
+      .append(" ")
+      .append(report.getTargetType())
+      .append("/")
+      .append(report.getTargetId());
+    if (StringUtils.hasText(report.getResolution())) {
+      content.append("，处理说明：").append(report.getResolution().trim());
+    }
+    return content.toString();
+  }
+
+  private boolean isTerminalReviewStatus(ContentReportStatus status) {
+    return status == ContentReportStatus.RESOLVED || status == ContentReportStatus.DISMISSED;
   }
 
   private String trimToLimit(String value, int limit) {

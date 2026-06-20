@@ -1,6 +1,7 @@
 package com.openisle.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.openisle.dto.MessageNotificationPayload;
 import com.openisle.dto.NotificationDeliveryPreferenceDto;
 import com.openisle.dto.NotificationDeliveryPreferenceUpdateRequest;
 import com.openisle.dto.NotificationPreferenceDto;
@@ -39,6 +40,7 @@ public class NotificationService {
   private final PushNotificationService pushNotificationService;
   private final ReactionRepository reactionRepository;
   private final Executor notificationExecutor;
+  private final NotificationProducer notificationProducer;
 
   @Value("${app.website-url}")
   private String websiteUrl;
@@ -106,6 +108,7 @@ public class NotificationService {
         notificationRepository.deleteByTypeAndFromUserAndPost(type, fromUser, post);
       }
       n = notificationRepository.save(n);
+      publishSiteNotificationUnreadCount(user);
     }
 
     //        Runnable asyncTask = () -> {
@@ -353,6 +356,39 @@ public class NotificationService {
       }
     }
     notificationRepository.saveAll(notifs);
+    publishSiteNotificationUnreadCount(user);
+  }
+
+  private void publishSiteNotificationUnreadCount(User user) {
+    if (user == null || user.getUsername() == null) {
+      return;
+    }
+    Runnable task = () -> {
+      try {
+        long unread = countUnread(user.getUsername());
+        notificationProducer.sendNotification(
+          new MessageNotificationPayload(user.getUsername(), Map.of("notificationUnreadCount", unread))
+        );
+      } catch (Exception e) {
+        log.warn(
+          "Failed to publish site notification unread count for {}: {}",
+          user.getUsername(),
+          e.getMessage()
+        );
+      }
+    };
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      TransactionSynchronizationManager.registerSynchronization(
+        new TransactionSynchronization() {
+          @Override
+          public void afterCommit() {
+            task.run();
+          }
+        }
+      );
+    } else {
+      task.run();
+    }
   }
 
   public NotificationDeliveryPreferenceDto getDeliveryPreferences(String username) {

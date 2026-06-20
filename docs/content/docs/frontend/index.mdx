@@ -5,31 +5,32 @@ description: 珞珈论坛前端应用开发指南
 
 # 前端开发
 
-珞珈论坛前端基于 Nuxt.js 框架构建，提供面向武汉大学校园交流的用户界面和交互体验。
+珞珈论坛前端基于 Nuxt 3 框架构建，提供面向武汉大学校园交流的用户界面和交互体验。
 
 ## 技术栈
 
-- **Nuxt.js** - Vue.js 全栈框架
+- **Nuxt 3** - Vue.js 全栈框架（SSR）
 - **Vue 3** - 前端框架
-- **TypeScript** - 类型安全
-- **Tailwind CSS** - 样式框架
-- **Pinia** - 状态管理
+- **STOMP / WebSocket** - 实时消息
+- **Vditor** - Markdown 编辑器
+- **自定义 CSS** - 全局样式与主题
 
 ## 项目结构
 
 ```
 frontend_nuxt/
 ├── components/         # Vue 组件
-├── pages/             # 页面路由
-├── composables/       # 组合式函数
-├── plugins/           # 插件配置
-├── utils/             # 工具函数
-└── assets/            # 静态资源
+├── pages/              # 页面路由
+├── composables/        # 组合式函数（WebSocket 等）
+├── plugins/            # 运行时插件（鉴权 fetch、主题）
+├── utils/              # 工具函数
+├── assets/             # 样式与字体
+└── public/             # 静态资源
 ```
 
 ## 开发环境设置
 
-1. 安装 Node.js 18+
+1. 安装 Node.js 20+
 2. 安装依赖：`npm install`
 3. 启动开发服务器：`npm run dev`
 4. 访问 http://localhost:3000
@@ -39,8 +40,9 @@ frontend_nuxt/
 - 用户认证和授权
 - 文章发布和管理
 - 评论和互动
+- 匿名树洞
 - 实时消息
-- 用户个人资料
+- 积分商城
 - 管理后台
 
 ## 组件库
@@ -49,5 +51,6 @@ frontend_nuxt/
 
 - `BaseInput` - 输入框组件
 - `BasePopup` - 弹窗组件
+- `BasePlaceholder` - 空态占位组件
 - `PostEditor` - 文章编辑器
 - `CommentEditor` - 评论编辑器

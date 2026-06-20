@@ -14,7 +14,7 @@ public class TagValidator {
       throw new FieldException("name", "Tag name cannot be empty");
     }
     if (!ALLOWED.matcher(name).matches()) {
-      throw new FieldException("name", "Tag name must be letters or numbers");
+      throw new FieldException("name", "Tag name must be letters, numbers, or Chinese characters");
     }
   }
 }

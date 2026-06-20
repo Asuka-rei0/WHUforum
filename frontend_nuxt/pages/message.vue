@@ -674,6 +674,40 @@
                       <span v-if="item.content">，{{ item.content }}</span>
                     </NotificationContainer>
                   </template>
+                  <template v-else-if="item.type === 'CONTENT_REPORT_REVIEWED' && item.approved">
+                    <NotificationContainer :item="item" :markRead="markRead">
+                      您提交的内容举报已处理
+                      <template v-if="item.post">
+                        ：
+                        <NuxtLink
+                          class="notif-content-text"
+                          @click="markRead(item.id)"
+                          :to="`/posts/${item.post.id}${item.comment ? `#comment-${item.comment.id}` : ''}`"
+                        >
+                          {{ stripMarkdownLength(item.post.title, 100) }}
+                        </NuxtLink>
+                      </template>
+                      <span v-if="item.content">，{{ item.content }}</span>
+                    </NotificationContainer>
+                  </template>
+                  <template
+                    v-else-if="item.type === 'CONTENT_REPORT_REVIEWED' && item.approved === false"
+                  >
+                    <NotificationContainer :item="item" :markRead="markRead">
+                      您提交的内容举报已被驳回
+                      <template v-if="item.post">
+                        ：
+                        <NuxtLink
+                          class="notif-content-text"
+                          @click="markRead(item.id)"
+                          :to="`/posts/${item.post.id}${item.comment ? `#comment-${item.comment.id}` : ''}`"
+                        >
+                          {{ stripMarkdownLength(item.post.title, 100) }}
+                        </NuxtLink>
+                      </template>
+                      <span v-if="item.content">，{{ item.content }}</span>
+                    </NotificationContainer>
+                  </template>
                   <template v-else>
                     <NotificationContainer :item="item" :markRead="markRead">
                       {{ formatType(item.type) }}
@@ -717,6 +751,7 @@ import {
 } from '~/utils/notification'
 import TimeManager from '~/utils/time'
 import BaseSwitch from '~/components/BaseSwitch.vue'
+import { getNotificationTypeLabel } from '~/utils/notificationTypeLabels'
 import { navigateTo } from 'nuxt/app'
 
 const config = useRuntimeConfig()
@@ -851,70 +886,7 @@ const reject = async (id, nid) => {
   }
 }
 
-const formatType = (t) => {
-  switch (t) {
-    case 'POST_VIEWED':
-      return '帖子被查看'
-    case 'COMMENT_REPLY':
-      return '有人回复了你'
-    case 'REACTION':
-      return '有人点赞'
-    case 'POST_REVIEW_REQUEST':
-      return '帖子待审核'
-    case 'POST_REVIEWED':
-      return '帖子审核结果'
-    case 'POST_UPDATED':
-      return '关注的帖子有新评论'
-    case 'FOLLOWED_POST':
-      return '关注的用户发布了新文章'
-    case 'POST_SUBSCRIBED':
-      return '有人订阅了你的文章'
-    case 'POST_UNSUBSCRIBED':
-      return '有人取消订阅你的文章'
-    case 'USER_FOLLOWED':
-      return '有人关注了你'
-    case 'USER_UNFOLLOWED':
-      return '有人取消关注你'
-    case 'USER_ACTIVITY':
-      return '关注的用户有新动态'
-    case 'MENTION':
-      return '有人提到了你'
-    case 'REGISTER_REQUEST':
-      return '有人申请注册'
-    case 'ACTIVITY_REDEEM':
-      return '有人申请兑换奶茶'
-    case 'POINT_REDEEM':
-      return '有人申请积分兑换'
-    case 'DONATION':
-      return '有人打赏了你'
-    case 'LOTTERY_WIN':
-      return '抽奖中奖了'
-    case 'LOTTERY_DRAW':
-      return '抽奖已开奖'
-    case 'POST_DELETED':
-      return '帖子被删除'
-    case 'POST_FEATURED':
-      return '文章被精选'
-    case 'FLEA_MARKET_STATUS':
-      return '跳蚤市场状态更新'
-    case 'MODERATION_ALERT':
-      return '内容审核提醒'
-    case 'CONTENT_REPORT':
-      return '内容举报'
-    case 'POLL_VOTE':
-      return '有人参与你的投票'
-    case 'POLL_RESULT_OWNER':
-      return '发布的投票结果已公布'
-    case 'POLL_RESULT_PARTICIPANT':
-      return '参与的投票结果已公布'
-    case 'CATEGORY_PROPOSAL_RESULT_OWNER':
-      return '分类提案结果已公布'
-    case 'CATEGORY_PROPOSAL_RESULT_PARTICIPANT':
-      return '参与的分类提案结果已公布'
-    default:
-      return t
-  }
-}
+const formatType = (t) => getNotificationTypeLabel(t)
 
 const isAdmin = computed(() => authState.role === 'ADMIN')
 

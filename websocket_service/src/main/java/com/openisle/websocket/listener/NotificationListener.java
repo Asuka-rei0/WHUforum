@@ -55,6 +55,16 @@ public class NotificationListener {
             if (payloadObject instanceof Map) {
                 Map<String, Object> payloadMap = (Map<String, Object>) payloadObject;
 
+                if (payloadMap.containsKey("notificationUnreadCount")) {
+                    messagingTemplate.convertAndSendToUser(
+                        username,
+                        "/queue/notification-unread-count",
+                        payloadMap.get("notificationUnreadCount")
+                    );
+                    log.info("Sent site notification unread count to user {}", username);
+                    return;
+                }
+
                 if ("MESSAGE_REACTION".equals(payloadMap.get("eventType"))) {
                     Object conversationIdObj = payloadMap.get("conversationId");
                     if (conversationIdObj instanceof Number) {

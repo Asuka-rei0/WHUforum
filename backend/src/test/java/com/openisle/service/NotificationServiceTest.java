@@ -27,13 +27,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -69,13 +71,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -108,13 +112,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -143,13 +149,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -189,13 +197,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -233,13 +243,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -268,13 +280,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -303,13 +317,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -338,13 +354,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -383,13 +401,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
@@ -432,13 +452,15 @@ class NotificationServiceTest {
     EmailSender email = mock(EmailSender.class);
     PushNotificationService push = mock(PushNotificationService.class);
     Executor executor = Runnable::run;
+    NotificationProducer notificationProducer = mock(NotificationProducer.class);
     NotificationService service = new NotificationService(
       nRepo,
       uRepo,
       email,
       push,
       rRepo,
-      executor
+      executor,
+      notificationProducer
     );
     org.springframework.test.util.ReflectionTestUtils.setField(
       service,
