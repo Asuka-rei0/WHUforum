@@ -83,6 +83,9 @@ import {
   Financing,
   Hands,
   PreviewCloseOne,
+  DashboardOne,
+  Report,
+  Audit,
 } from '@icon-park/vue-next'
 
 export default defineNuxtPlugin((nuxtApp) => {
@@ -169,4 +172,7 @@ export default defineNuxtPlugin((nuxtApp) => {
   nuxtApp.vueApp.component('Financing', Financing)
   nuxtApp.vueApp.component('Hands', Hands)
   nuxtApp.vueApp.component('PreviewCloseOne', PreviewCloseOne)
+  nuxtApp.vueApp.component('DashboardOne', DashboardOne)
+  nuxtApp.vueApp.component('Report', Report)
+  nuxtApp.vueApp.component('Audit', Audit)
 })

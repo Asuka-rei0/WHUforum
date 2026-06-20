@@ -178,6 +178,8 @@ public class SecurityConfig {
           .permitAll()
           .requestMatchers(HttpMethod.GET, "/uploads/**")
           .permitAll()
+          .requestMatchers(HttpMethod.GET, "/api/sitemap.xml")
+          .permitAll()
           .requestMatchers(HttpMethod.POST, "/api/categories/**")
           .hasAuthority("ADMIN")
           .requestMatchers(HttpMethod.POST, "/api/tags/**")

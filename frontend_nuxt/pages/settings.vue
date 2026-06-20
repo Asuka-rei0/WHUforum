@@ -81,6 +81,17 @@
           </div>
           <BaseSwitch v-model="pushNotifications" />
         </div>
+        <div class="form-row dropdown-row digest-row">
+          <div>
+            <div class="setting-title">通知摘要</div>
+            <div class="setting-description">将非紧急通知合并为邮件摘要发送</div>
+          </div>
+          <select v-model="digestFrequency" class="digest-select">
+            <option value="NONE">不发送摘要</option>
+            <option value="DAILY">每日摘要</option>
+            <option value="WEEKLY">每周摘要</option>
+          </select>
+        </div>
       </div>
       <div v-if="role === 'ADMIN'" class="admin-section">
         <h3>管理员设置</h3>
@@ -469,6 +480,20 @@ const deleteAccount = async () => {
 
 .dropdown-row {
   max-width: 200px;
+}
+
+.digest-row {
+  max-width: none;
+}
+
+.digest-select {
+  background: var(--background-color);
+  border: 1px solid var(--normal-border-color);
+  border-radius: 8px;
+  color: var(--text-color);
+  min-height: 36px;
+  padding: 8px 10px;
+  width: min(220px, 100%);
 }
 
 .switch-row {

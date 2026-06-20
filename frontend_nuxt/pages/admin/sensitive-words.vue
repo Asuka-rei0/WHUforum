@@ -14,10 +14,7 @@
       </button>
     </header>
 
-    <div v-if="!isAdmin" class="access-denied">仅管理员可以管理敏感词</div>
-
-    <template v-else>
-      <section class="form-panel">
+    <section class="form-panel">
         <h2>{{ editingWord ? '编辑敏感词' : '添加敏感词' }}</h2>
         <form class="word-form" @submit.prevent="saveWord">
           <label>
@@ -54,7 +51,7 @@
             <option value="normal">普通词</option>
           </select>
         </label>
-        <span>{{ filteredWords.length }} 条</span>
+        <span>{{ filteredWords.length }} 条 · 第 {{ page }} / {{ totalPages }} 页</span>
       </section>
 
       <section class="word-list">
@@ -63,7 +60,7 @@
         </div>
         <BasePlaceholder v-else-if="filteredWords.length === 0" text="暂无敏感词" />
         <template v-else>
-          <article v-for="item in filteredWords" :key="item.id" class="word-item">
+          <article v-for="item in paginatedWords" :key="item.id" class="word-item">
             <div class="word-topline">
               <strong class="word-text">{{ item.word }}</strong>
               <span class="status-pill" :class="item.crisis ? 'pill-crisis' : 'pill-normal'">
@@ -80,19 +77,23 @@
             </div>
           </article>
         </template>
+        <div v-if="totalPages > 1" class="pagination-bar">
+          <button type="button" :disabled="page <= 1" @click="page -= 1">上一页</button>
+          <span>{{ page }} / {{ totalPages }}</span>
+          <button type="button" :disabled="page >= totalPages" @click="page += 1">下一页</button>
+        </div>
       </section>
-    </template>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useToast } from 'vue-toastification'
 import BasePlaceholder from '~/components/BasePlaceholder.vue'
-import { authState, getToken, loadCurrentUser } from '~/utils/auth'
+import { getToken } from '~/utils/auth'
 import { getApiErrorMessage } from '~/utils/apiError'
 
-definePageMeta({ middleware: ['auth-required'] })
+definePageMeta({ middleware: ['admin-required'] })
 
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
@@ -100,11 +101,12 @@ const toast = useToast()
 
 const words = ref([])
 const filter = ref('all')
+const page = ref(1)
+const pageSize = 20
 const loading = ref(false)
 const saving = ref(false)
 const editingWord = ref(null)
 const form = ref({ word: '', crisis: false, enabled: true })
-const isAdmin = computed(() => authState.role === 'ADMIN')
 
 const authHeaders = () => {
   const token = getToken()
@@ -127,13 +129,26 @@ const filteredWords = computed(() => {
   }
 })
 
+const totalPages = computed(() =>
+  Math.max(1, Math.ceil(filteredWords.value.length / pageSize)),
+)
+
+const paginatedWords = computed(() => {
+  const start = (page.value - 1) * pageSize
+  return filteredWords.value.slice(start, start + pageSize)
+})
+
+watch(filter, () => {
+  page.value = 1
+})
+
 const resetForm = () => {
   editingWord.value = null
   form.value = { word: '', crisis: false, enabled: true }
 }
 
 const loadWords = async () => {
-  if (!isAdmin.value || loading.value) return
+  if (loading.value) return
   loading.value = true
   try {
     const res = await fetch(`${API_BASE_URL}/api/admin/sensitive-words`, { headers: authHeaders() })
@@ -205,10 +220,7 @@ const formatTime = (value) => {
   return new Date(value).toLocaleString('zh-CN', { hour12: false })
 }
 
-onMounted(async () => {
-  await loadCurrentUser()
-  await loadWords()
-})
+onMounted(loadWords)
 </script>
 
 <style scoped>
@@ -405,8 +417,30 @@ onMounted(async () => {
   color: #6b7280;
 }
 
-.loading-block,
-.access-denied {
+.pagination-bar {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.pagination-bar button {
+  background: var(--background-color);
+  border: 1px solid var(--normal-border-color);
+  border-radius: 8px;
+  color: var(--text-color);
+  cursor: pointer;
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.pagination-bar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.loading-block {
   align-items: center;
   display: flex;
   justify-content: center;

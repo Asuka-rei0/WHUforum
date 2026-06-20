@@ -80,7 +80,7 @@ class ContentReportServiceTest {
         approvedCaptor.capture(),
         eq(admin),
         isNull(),
-        eq("举报 #5 POST/9，处理说明：已删除违规内容")
+        eq("举报 #5 帖子 #9，处理说明：已删除违规内容")
       );
     assertTrue(approvedCaptor.getValue());
   }
@@ -112,7 +112,7 @@ class ContentReportServiceTest {
         eq(false),
         eq(admin),
         isNull(),
-        eq("举报 #6 POST/9")
+        eq("举报 #6 帖子 #9")
       );
   }
 

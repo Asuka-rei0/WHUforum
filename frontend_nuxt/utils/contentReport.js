@@ -26,8 +26,23 @@ export const getContentReportReasonText = (reason) => REASON_TEXT[reason] || rea
 export const getContentReportTargetText = (targetType) =>
   TARGET_TEXT[targetType] || targetType || '内容'
 
-export const getContentReportPostRoute = (report) => {
-  if (!report?.postId) return ''
+export const getContentReportTargetRoute = (report) => {
+  if (!report) return ''
+
+  const type = report.targetType
+
+  if (type === 'MESSAGE') {
+    if (!report.conversationId) return ''
+    const query = report.messageId ? `?highlight=${report.messageId}` : ''
+    return `/message-box/${report.conversationId}${query}`
+  }
+
+  const postId = report.postId || (type === 'POST' || type === 'TREEHOLE' ? report.targetId : null)
+  if (!postId) return ''
+
   const hash = report.commentId ? `#comment-${report.commentId}` : ''
-  return `/posts/${report.postId}${hash}`
+  return `/posts/${postId}${hash}`
 }
+
+/** @deprecated 使用 getContentReportTargetRoute */
+export const getContentReportPostRoute = getContentReportTargetRoute

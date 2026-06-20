@@ -100,9 +100,6 @@ class HelloControllerTest {
       .perform(get("/api/rss"))
       .andExpect(status().isUnauthorized())
       .andExpect(jsonPath("$.error").value("Missing token"));
-    mockMvc
-      .perform(get("/api/sitemap.xml"))
-      .andExpect(status().isUnauthorized())
-      .andExpect(jsonPath("$.error").value("Missing token"));
+    mockMvc.perform(get("/api/sitemap.xml")).andExpect(status().isOk());
   }
 }

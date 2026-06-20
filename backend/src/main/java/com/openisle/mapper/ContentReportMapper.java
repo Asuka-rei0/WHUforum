@@ -41,7 +41,10 @@ public class ContentReportMapper {
     }
     if (report.getMessage() != null) {
       dto.setMessageId(report.getMessage().getId());
-      dto.setTargetTitle("Private message #" + report.getMessage().getId());
+      if (report.getMessage().getConversation() != null) {
+        dto.setConversationId(report.getMessage().getConversation().getId());
+      }
+      dto.setTargetTitle("私信 #" + report.getMessage().getId());
       dto.setTargetExcerpt(excerpt(report.getMessage().getContent()));
     }
     return dto;

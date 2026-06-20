@@ -155,15 +155,7 @@ public class ContentReportService {
   }
 
   private void notifyAdmins(ContentReport report) {
-    String content =
-      "Content report #" +
-      report.getId() +
-      " " +
-      report.getTargetType() +
-      "/" +
-      report.getTargetId() +
-      " reason=" +
-      report.getReason();
+    String content = buildAdminReportNotificationContent(report);
     for (User admin : userRepository.findByRole(Role.ADMIN)) {
       notificationService.createNotification(
         admin,
@@ -196,19 +188,59 @@ public class ContentReportService {
     );
   }
 
+  private String buildAdminReportNotificationContent(ContentReport report) {
+    return "新举报 #"
+      + report.getId()
+      + "："
+      + targetTypeLabel(report.getTargetType())
+      + " #"
+      + report.getTargetId()
+      + "，原因："
+      + reasonLabel(report.getReason());
+  }
+
   private String buildReporterNotificationContent(ContentReport report) {
     StringBuilder content = new StringBuilder();
     content
       .append("举报 #")
       .append(report.getId())
       .append(" ")
-      .append(report.getTargetType())
-      .append("/")
+      .append(targetTypeLabel(report.getTargetType()))
+      .append(" #")
       .append(report.getTargetId());
     if (StringUtils.hasText(report.getResolution())) {
       content.append("，处理说明：").append(report.getResolution().trim());
     }
     return content.toString();
+  }
+
+  private String targetTypeLabel(ContentReportTargetType type) {
+    if (type == null) {
+      return "内容";
+    }
+    return switch (type) {
+      case POST -> "帖子";
+      case COMMENT -> "评论";
+      case MESSAGE -> "私信";
+      case TREEHOLE -> "树洞";
+    };
+  }
+
+  private String reasonLabel(ContentReportReason reason) {
+    if (reason == null) {
+      return "其他";
+    }
+    return switch (reason) {
+      case SPAM -> "垃圾广告";
+      case HARASSMENT -> "骚扰或攻击";
+      case HATE -> "仇恨或歧视";
+      case SEXUAL -> "色情低俗";
+      case VIOLENCE -> "暴力威胁";
+      case SELF_HARM -> "自伤风险";
+      case PRIVACY -> "隐私泄露";
+      case ILLEGAL -> "违法违规";
+      case OTHER -> "其他";
+    };
   }
 
   private boolean isTerminalReviewStatus(ContentReportStatus status) {

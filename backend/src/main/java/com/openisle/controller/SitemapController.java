@@ -2,12 +2,12 @@ package com.openisle.controller;
 
 import com.openisle.model.Post;
 import com.openisle.model.PostStatus;
+import com.openisle.model.PostType;
 import com.openisle.repository.PostRepository;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api")
-@SecurityRequirement(name = "JWT")
 public class SitemapController {
 
   private final PostRepository postRepository;
@@ -45,13 +44,25 @@ public class SitemapController {
     body.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
     body.append("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\">\n");
 
-    List<String> staticRoutes = List.of("/", "/about", "/activities", "/login", "/signup");
+    List<String> staticRoutes = List.of(
+      "/",
+      "/about",
+      "/activities",
+      "/login",
+      "/signup",
+      "/treehole",
+      "/treehole/square",
+      "/points"
+    );
 
     for (String path : staticRoutes) {
       body.append("  <url><loc>").append(websiteUrl).append(path).append("</loc></url>\n");
     }
 
     for (Post p : posts) {
+      if (p.getType() == PostType.TREEHOLE) {
+        continue;
+      }
       body
         .append("  <url>\n")
         .append("    <loc>")

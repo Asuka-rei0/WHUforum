@@ -10,94 +10,90 @@
       </button>
     </header>
 
-    <div v-if="!isAdmin" class="access-denied">仅管理员可以查看举报队列</div>
+    <section class="filter-panel">
+      <label>
+        <span>状态</span>
+        <select v-model="status">
+          <option value="">全部</option>
+          <option value="OPEN">待处理</option>
+          <option value="REVIEWING">处理中</option>
+          <option value="RESOLVED">已处理</option>
+          <option value="DISMISSED">已驳回</option>
+        </select>
+      </label>
+      <span>{{ reports.length }} 条</span>
+    </section>
 
-    <template v-else>
-      <section class="filter-panel">
-        <label>
-          <span>状态</span>
-          <select v-model="status">
-            <option value="">全部</option>
-            <option value="OPEN">待处理</option>
-            <option value="REVIEWING">处理中</option>
-            <option value="RESOLVED">已处理</option>
-            <option value="DISMISSED">已驳回</option>
-          </select>
-        </label>
-        <span>{{ reports.length }} 条</span>
-      </section>
-
-      <section class="report-list">
-        <div v-if="loading" class="loading-block">
-          <l-hatch size="28" stroke="4" speed="3.5" color="var(--primary-color)"></l-hatch>
-        </div>
-        <BasePlaceholder v-else-if="reports.length === 0" text="暂无举报" />
-        <template v-else>
-          <article v-for="report in reports" :key="report.id" class="report-item">
-            <div class="report-topline">
-              <span class="status-pill" :class="statusClass(report.status)">
-                {{ statusText(report.status) }}
-              </span>
-              <NuxtLink
-                v-if="getContentReportPostRoute(report)"
-                class="report-target-link"
-                :to="getContentReportPostRoute(report)"
-              >
-                {{ getContentReportTargetText(report.targetType) }} #{{ report.targetId }}
-              </NuxtLink>
-              <span v-else>{{ getContentReportTargetText(report.targetType) }} #{{ report.targetId }}</span>
-              <time>{{ formatTime(report.createdAt) }}</time>
-            </div>
-            <h2>{{ report.targetTitle || '未命名内容' }}</h2>
-            <p>{{ report.targetExcerpt || '暂无摘要' }}</p>
-            <div class="report-meta">
-              <span>举报人：{{ report.reporterUsername || '未知' }}</span>
-              <span>原因：{{ getContentReportReasonText(report.reason) }}</span>
-            </div>
-            <div v-if="report.detail" class="report-detail">
-              <span>具体说明</span>
-              <p>{{ report.detail }}</p>
-            </div>
-            <textarea v-model="resolutionById[report.id]" placeholder="处理备注"></textarea>
-            <div class="report-actions">
-              <button type="button" @click="handleReport(report, 'REVIEWING')">标记处理中</button>
-              <button type="button" class="positive" @click="handleReport(report, 'RESOLVED')">
-                标记已处理
-              </button>
-              <button type="button" class="danger" @click="handleReport(report, 'DISMISSED')">
-                驳回举报
-              </button>
-            </div>
-          </article>
-        </template>
-      </section>
-    </template>
+    <section class="report-list">
+      <div v-if="loading" class="loading-block">
+        <l-hatch size="28" stroke="4" speed="3.5" color="var(--primary-color)"></l-hatch>
+      </div>
+      <BasePlaceholder v-else-if="reports.length === 0" text="暂无举报" />
+      <template v-else>
+        <article v-for="report in reports" :key="report.id" class="report-item">
+          <div class="report-topline">
+            <span class="status-pill" :class="statusClass(report.status)">
+              {{ statusText(report.status) }}
+            </span>
+            <NuxtLink
+              v-if="getContentReportTargetRoute(report)"
+              class="report-target-link"
+              :to="getContentReportTargetRoute(report)"
+            >
+              {{ getContentReportTargetText(report.targetType) }} #{{ report.targetId }}
+            </NuxtLink>
+            <span v-else>{{ getContentReportTargetText(report.targetType) }} #{{ report.targetId }}</span>
+            <time>{{ formatTime(report.createdAt) }}</time>
+          </div>
+          <h2>{{ report.targetTitle || '未命名内容' }}</h2>
+          <p>{{ report.targetExcerpt || '暂无摘要' }}</p>
+          <div class="report-meta">
+            <span>举报人：{{ report.reporterUsername || '未知' }}</span>
+            <span>原因：{{ getContentReportReasonText(report.reason) }}</span>
+          </div>
+          <div v-if="report.detail" class="report-detail">
+            <span>具体说明</span>
+            <p>{{ report.detail }}</p>
+          </div>
+          <textarea v-model="resolutionById[report.id]" placeholder="处理备注"></textarea>
+          <div class="report-actions">
+            <button type="button" @click="handleReport(report, 'REVIEWING')">标记处理中</button>
+            <button type="button" class="positive" @click="handleReport(report, 'RESOLVED')">
+              标记已处理
+            </button>
+            <button type="button" class="danger" @click="handleReport(report, 'DISMISSED')">
+              驳回举报
+            </button>
+          </div>
+        </article>
+      </template>
+    </section>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { useToast } from 'vue-toastification'
 import BasePlaceholder from '~/components/BasePlaceholder.vue'
-import { authState, getToken, loadCurrentUser } from '~/utils/auth'
+import { getToken } from '~/utils/auth'
 import { getApiErrorMessage } from '~/utils/apiError'
 import {
-  getContentReportPostRoute,
+  getContentReportTargetRoute,
   getContentReportReasonText,
   getContentReportTargetText,
 } from '~/utils/contentReport'
 
-definePageMeta({ middleware: ['auth-required'] })
+definePageMeta({ middleware: ['admin-required'] })
 
+const route = useRoute()
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
 const toast = useToast()
 
 const reports = ref([])
-const status = ref('OPEN')
+const status = ref(String(route.query.status || 'OPEN'))
 const loading = ref(false)
 const resolutionById = ref({})
-const isAdmin = computed(() => authState.role === 'ADMIN')
 
 const authHeaders = () => {
   const token = getToken()
@@ -105,7 +101,7 @@ const authHeaders = () => {
 }
 
 const loadReports = async () => {
-  if (!isAdmin.value || loading.value) return
+  if (loading.value) return
   loading.value = true
   try {
     const url = new URL(`${API_BASE_URL}/api/admin/reports`)
@@ -158,10 +154,14 @@ const formatTime = (value) => {
 
 watch(status, loadReports)
 
-onMounted(async () => {
-  await loadCurrentUser()
-  await loadReports()
-})
+watch(
+  () => route.query.status,
+  (value) => {
+    status.value = value ? String(value) : ''
+  },
+)
+
+onMounted(loadReports)
 </script>
 
 <style scoped>
@@ -346,8 +346,7 @@ onMounted(async () => {
   color: #6b7280;
 }
 
-.loading-block,
-.access-denied {
+.loading-block {
   align-items: center;
   display: flex;
   justify-content: center;

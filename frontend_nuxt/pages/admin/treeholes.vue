@@ -17,13 +17,7 @@
       </button>
     </header>
 
-    <div v-if="!isAdmin" class="access-denied">
-      <user-icon class="access-icon" />
-      <div>仅管理员可以查看树洞复审后台</div>
-    </div>
-
-    <template v-else>
-      <section class="filter-panel" aria-label="树洞复审筛选">
+    <section class="filter-panel" aria-label="树洞复审筛选">
         <div class="filters">
           <label>
             <span>风险等级</span>
@@ -276,20 +270,19 @@
           <BasePlaceholder text="请选择一个风险树洞查看详情" />
         </section>
       </div>
-    </template>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
 import { useToast } from 'vue-toastification'
-import { authState, getToken, loadCurrentUser } from '~/utils/auth'
+import { authState, getToken } from '~/utils/auth'
 
 const config = useRuntimeConfig()
 const API_BASE_URL = config.public.apiBaseUrl
 const toast = useToast()
 
-definePageMeta({ middleware: ['auth-required'] })
+definePageMeta({ middleware: ['admin-required'] })
 
 const cases = ref([])
 const detail = ref(null)
@@ -305,7 +298,6 @@ const caseStatus = ref('')
 const actionNote = ref('')
 const revealReason = ref('')
 
-const isAdmin = computed(() => authState.role === 'ADMIN')
 const isClosed = computed(() => detail.value?.caseInfo?.status === 'CLOSED')
 
 const actionButtons = Object.freeze([
@@ -329,7 +321,7 @@ const authHeaders = () => {
 }
 
 const loadCases = async (reset = false) => {
-  if (!isAdmin.value || loadingCases.value) return
+  if (loadingCases.value) return
   loadingCases.value = true
   try {
     const url = new URL(`${API_BASE_URL}/api/admin/treeholes/risk`)
@@ -542,11 +534,8 @@ const formatTime = (value) => {
 
 watch([riskLevel, caseStatus], () => loadCases(true))
 
-onMounted(async () => {
-  await loadCurrentUser()
-  if (isAdmin.value) {
-    await loadCases(true)
-  }
+onMounted(() => {
+  loadCases(true)
 })
 </script>
 
@@ -1123,24 +1112,11 @@ onMounted(async () => {
 }
 
 .loading-block,
-.access-denied,
 .empty-detail {
   align-items: center;
   display: flex;
   justify-content: center;
   min-height: 260px;
-}
-
-.access-denied {
-  border: 1px solid var(--admin-border);
-  border-radius: 8px;
-  color: var(--admin-muted);
-  gap: 10px;
-}
-
-.access-icon {
-  height: 22px;
-  width: 22px;
 }
 
 @media (max-width: 980px) {

@@ -2,121 +2,158 @@
   <transition name="slide">
     <nav v-if="visible" class="menu">
       <div class="menu-content">
-        <div class="menu-item-container">
-          <NuxtLink class="menu-item" exact-active-class="selected" to="/" @click="handleItemClick">
-            <hashtag-key class="menu-item-icon" />
-            <span class="menu-item-text">话题</span>
-          </NuxtLink>
-          <NuxtLink
-            class="menu-item"
-            exact-active-class="selected"
-            to="/new-post"
-            @click="handleItemClick"
-          >
-            <edit class="menu-item-icon" />
-            <span class="menu-item-text">发帖</span>
-          </NuxtLink>
-          <NuxtLink
-            class="menu-item"
-            exact-active-class="selected"
-            to="/treehole"
-            @click="handleItemClick"
-          >
-            <message-one class="menu-item-icon" />
-            <span class="menu-item-text">匿名树洞</span>
-          </NuxtLink>
-          <NuxtLink
-            class="menu-item"
-            exact-active-class="selected"
-            to="/message"
-            @click="handleItemClick"
-          >
-            <remind class="menu-item-icon" />
-            <span class="menu-item-text">我的消息</span>
-            <span v-if="unreadCount > 0" class="unread-container">
-              <span class="unread"> {{ showUnreadCount }} </span>
-            </span>
-          </NuxtLink>
-          <NuxtLink
-            class="menu-item"
-            exact-active-class="selected"
-            to="/about"
-            @click="handleItemClick"
-          >
-            <info-icon class="menu-item-icon" />
-            <span class="menu-item-text">关于</span>
-          </NuxtLink>
-          <NuxtLink
-            class="menu-item"
-            exact-active-class="selected"
-            to="/activities"
-            @click="handleItemClick"
-          >
-            <gift class="menu-item-icon" />
-            <span class="menu-item-text">🔥 活动</span>
-          </NuxtLink>
-          <NuxtLink
-            v-if="shouldShowStats"
-            class="menu-item"
-            exact-active-class="selected"
-            to="/about/stats"
-            @click="handleItemClick"
-          >
-            <chart-line class="menu-item-icon" />
-            <span class="menu-item-text">站点统计</span>
-          </NuxtLink>
-          <NuxtLink
-            v-if="shouldShowStats"
-            class="menu-item"
-            exact-active-class="selected"
-            to="/admin/treeholes"
-            @click="handleItemClick"
-          >
-            <message-one class="menu-item-icon" />
-            <span class="menu-item-text">树洞复审</span>
-          </NuxtLink>
-          <NuxtLink
-            v-if="shouldShowStats"
-            class="menu-item"
-            exact-active-class="selected"
-            to="/admin/reports"
-            @click="handleItemClick"
-          >
-            <remind class="menu-item-icon" />
-            <span class="menu-item-text">内容举报</span>
-          </NuxtLink>
-          <NuxtLink
-            v-if="shouldShowStats"
-            class="menu-item"
-            exact-active-class="selected"
-            to="/admin/sensitive-words"
-            @click="handleItemClick"
-          >
-            <protection class="menu-item-icon" />
-            <span class="menu-item-text">敏感词管理</span>
-          </NuxtLink>
-          <NuxtLink
-            v-if="authState.loggedIn"
-            class="menu-item"
-            exact-active-class="selected"
-            to="/points"
-            @click="handleItemClick"
-          >
-            <finance class="menu-item-icon" />
-            <span class="menu-item-text">
-              积分商城
-              <span v-if="myPoint !== null" class="point-count">{{ myPoint }}</span>
-            </span>
-          </NuxtLink>
+        <div class="menu-nav-groups">
+          <div class="menu-group">
+            <div class="menu-group-title">浏览</div>
+            <NuxtLink class="menu-item" exact-active-class="selected" to="/" @click="handleItemClick">
+              <hashtag-key class="menu-item-icon" />
+              <span class="menu-item-text">话题</span>
+            </NuxtLink>
+          </div>
+
+          <div class="menu-group">
+            <div class="menu-group-title">参与</div>
+            <NuxtLink
+              class="menu-item"
+              exact-active-class="selected"
+              to="/new-post"
+              @click="handleItemClick"
+            >
+              <edit class="menu-item-icon" />
+              <span class="menu-item-text">发帖</span>
+            </NuxtLink>
+            <NuxtLink
+              class="menu-item"
+              exact-active-class="selected"
+              to="/treehole"
+              @click="handleItemClick"
+            >
+              <message-one class="menu-item-icon" />
+              <span class="menu-item-text">匿名树洞</span>
+            </NuxtLink>
+            <NuxtLink
+              class="menu-item"
+              exact-active-class="selected"
+              to="/message"
+              @click="handleItemClick"
+            >
+              <remind class="menu-item-icon" />
+              <span class="menu-item-text">我的消息</span>
+              <span v-if="unreadCount > 0" class="unread-container">
+                <span class="unread"> {{ showUnreadCount }} </span>
+              </span>
+            </NuxtLink>
+            <NuxtLink
+              v-if="authState.loggedIn"
+              class="menu-item"
+              exact-active-class="selected"
+              to="/points"
+              @click="handleItemClick"
+            >
+              <finance class="menu-item-icon" />
+              <span class="menu-item-text">
+                积分商城
+                <span v-if="myPoint !== null" class="point-count">{{ myPoint }}</span>
+              </span>
+            </NuxtLink>
+          </div>
+
+          <div class="menu-group">
+            <div class="menu-group-title">发现</div>
+            <NuxtLink
+              class="menu-item"
+              exact-active-class="selected"
+              to="/activities"
+              @click="handleItemClick"
+            >
+              <gift class="menu-item-icon" />
+              <span class="menu-item-text">活动</span>
+            </NuxtLink>
+            <NuxtLink
+              class="menu-item"
+              exact-active-class="selected"
+              to="/about"
+              @click="handleItemClick"
+            >
+              <info-icon class="menu-item-icon" />
+              <span class="menu-item-text">关于</span>
+            </NuxtLink>
+          </div>
+
+          <div v-if="shouldShowStats" class="menu-section admin-section">
+            <div class="section-header" @click="adminOpen = !adminOpen">
+              <span>管理后台</span>
+              <up v-if="adminOpen" class="menu-item-icon" />
+              <down v-else class="menu-item-icon" />
+            </div>
+            <div v-if="adminOpen" class="section-items">
+              <NuxtLink
+                class="menu-item"
+                exact-active-class="selected"
+                to="/admin"
+                @click="handleItemClick"
+              >
+                <dashboard-one class="menu-item-icon" />
+                <span class="menu-item-text">管理首页</span>
+              </NuxtLink>
+              <NuxtLink
+                class="menu-item"
+                exact-active-class="selected"
+                to="/admin/posts/pending"
+                @click="handleItemClick"
+              >
+                <file-text class="menu-item-icon" />
+                <span class="menu-item-text">待审核帖子</span>
+              </NuxtLink>
+              <NuxtLink
+                class="menu-item"
+                exact-active-class="selected"
+                to="/admin/reports"
+                @click="handleItemClick"
+              >
+                <report class="menu-item-icon" />
+                <span class="menu-item-text">内容举报</span>
+              </NuxtLink>
+              <NuxtLink
+                class="menu-item"
+                exact-active-class="selected"
+                to="/admin/treeholes"
+                @click="handleItemClick"
+              >
+                <audit class="menu-item-icon" />
+                <span class="menu-item-text">树洞复审</span>
+              </NuxtLink>
+              <NuxtLink
+                class="menu-item"
+                exact-active-class="selected"
+                to="/admin/sensitive-words"
+                @click="handleItemClick"
+              >
+                <protection class="menu-item-icon" />
+                <span class="menu-item-text">敏感词管理</span>
+              </NuxtLink>
+              <NuxtLink
+                class="menu-item"
+                exact-active-class="selected"
+                to="/about/stats"
+                @click="handleItemClick"
+              >
+                <chart-line class="menu-item-icon" />
+                <span class="menu-item-text">站点统计</span>
+              </NuxtLink>
+            </div>
+          </div>
         </div>
 
-        <div class="menu-section">
-          <div class="section-header" @click="categoryOpen = !categoryOpen">
-            <span>类别</span>
-            <up v-if="categoryOpen" class="menu-item-icon" />
-            <down v-else class="menu-item-icon" />
-          </div>
-          <div v-if="categoryOpen" class="section-items">
+        <div class="menu-filter-block">
+          <div class="menu-group-title">筛选</div>
+          <div class="menu-section">
+            <div class="section-header" @click="categoryOpen = !categoryOpen">
+              <span>类别</span>
+              <up v-if="categoryOpen" class="menu-item-icon" />
+              <down v-else class="menu-item-icon" />
+            </div>
+            <div v-if="categoryOpen" class="section-items">
             <div v-if="isLoadingCategory" class="menu-loading-container">
               <l-hatch size="28" stroke="4" speed="3.5" color="var(--primary-color)"></l-hatch>
             </div>
@@ -142,11 +179,11 @@
                 <span class="section-item-text-count" v-if="c.count >= 0">x {{ c.count }}</span>
               </span>
             </div>
+            </div>
           </div>
-        </div>
 
-        <div class="menu-section">
-          <div class="section-header" @click="tagOpen = !tagOpen">
+          <div class="menu-section">
+            <div class="section-header" @click="tagOpen = !tagOpen">
             <span>标签</span>
             <up v-if="tagOpen" class="menu-item-icon" />
             <down v-else class="menu-item-icon" />
@@ -180,6 +217,7 @@
                 >
               </div>
             </template>
+          </div>
           </div>
         </div>
       </div>
@@ -231,9 +269,24 @@ const props = defineProps({
 })
 const emit = defineEmits(['item-click'])
 
-const categoryOpen = ref(true)
-const tagOpen = ref(true)
+const categoryOpen = ref(false)
+const tagOpen = ref(false)
+const adminOpen = ref(false)
 const myPoint = ref(null)
+
+const route = useRoute()
+
+const isAdminRoute = (path) => path.startsWith('/admin') || path.startsWith('/about/stats')
+
+watch(
+  () => route.path,
+  (path) => {
+    if (isAdminRoute(path)) {
+      adminOpen.value = true
+    }
+  },
+  { immediate: true },
+)
 
 /** ✅ 用 useAsyncData 替换原生 fetch，避免 SSR+CSR 二次请求 */
 const {
@@ -405,17 +458,40 @@ const gotoTag = (t) => {
   scrollbar-width: none;
 }
 
-.menu-item-container {
+.menu-nav-groups {
   border-bottom: 1px solid var(--menu-border-color);
+  margin-bottom: 4px;
+  padding-bottom: 4px;
 }
 
-.menu-item:last-child {
-  margin-bottom: 5px;
+.menu-group {
+  padding-bottom: 2px;
 }
 
-/* .menu-item-container { */
-/**/
-/* } */
+.menu-group-title {
+  color: var(--menu-text-color);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  opacity: 0.55;
+  padding: 8px 12px 4px;
+}
+
+.menu-filter-block {
+  padding-top: 2px;
+}
+
+.menu-filter-block > .menu-group-title {
+  padding-top: 6px;
+}
+
+.admin-section {
+  margin-top: 4px;
+}
+
+.admin-section .section-items .menu-item {
+  margin-left: 0;
+}
 
 .menu-item {
   padding: 6px 12px;
@@ -586,7 +662,8 @@ const gotoTag = (t) => {
     left: 10px;
     border-radius: 20px;
     border-right: none;
-    height: 400px;
+    max-height: calc(100vh - var(--header-height) - 20px);
+    height: auto;
     top: calc(var(--header-height) + 10px);
     padding-top: 10px;
     background-color: var(--background-color-blur);

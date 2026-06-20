@@ -24,6 +24,7 @@ public class ContentReportDto {
   private Long postId;
   private Long commentId;
   private Long messageId;
+  private Long conversationId;
   private LocalDateTime createdAt;
   private LocalDateTime updatedAt;
   private LocalDateTime handledAt;
