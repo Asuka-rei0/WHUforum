@@ -1,33 +1,9 @@
 <template>
-  <div class="not-found-page">
-    <h1>404 - 页面不存在</h1>
-    <p>你访问的页面不存在或已被删除</p>
-    <NuxtLink to="/">返回首页</NuxtLink>
-  </div>
+  <NotFoundPanel />
 </template>
 
-<script>
-export default {
-  name: 'NotFoundPageView',
-}
+<script setup>
+useHead({
+  title: '页面不存在 - 珞珈论坛',
+})
 </script>
-
-<style scoped>
-.not-found-page {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 100%;
-  text-align: center;
-  background-color: var(--background-color);
-}
-
-.not-found-page h1 {
-  margin-bottom: 20px;
-}
-
-.not-found-page a {
-  color: var(--primary-color);
-  text-decoration: underline;
-}
-</style>

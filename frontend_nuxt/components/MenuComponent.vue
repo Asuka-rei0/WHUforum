@@ -86,6 +86,16 @@
             <span class="menu-item-text">内容举报</span>
           </NuxtLink>
           <NuxtLink
+            v-if="shouldShowStats"
+            class="menu-item"
+            exact-active-class="selected"
+            to="/admin/sensitive-words"
+            @click="handleItemClick"
+          >
+            <protection class="menu-item-icon" />
+            <span class="menu-item-text">敏感词管理</span>
+          </NuxtLink>
+          <NuxtLink
             v-if="authState.loggedIn"
             class="menu-item"
             exact-active-class="selected"

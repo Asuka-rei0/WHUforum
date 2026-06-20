@@ -49,7 +49,7 @@ const menuVisible = ref(!isMobile.value)
 const showNewPostIcon = computed(() => useRoute().path === '/')
 
 const hideMenu = computed(() => {
-  return ['/login', '/signup', '/404', '/signup-reason', '/forgot-password'].includes(
+  return ['/login', '/signup', '/signup-reason', '/forgot-password'].includes(
     useRoute().path,
   )
 })
